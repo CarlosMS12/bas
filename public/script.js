@@ -38,6 +38,7 @@ const elements = {
     modalOverlay: document.getElementById('modalOverlay'),
     modalClose: document.getElementById('modalClose'),
     modalContent: document.getElementById('modalContent'),
+    listHeader: document.getElementById('listHeader'),
     
     // Elementos de paginación
     paginationContainer: document.getElementById('paginationContainer'),
@@ -292,13 +293,15 @@ function displayStudents(students) {
     
     if (students.length === 0) {
         elements.resultsGrid.style.display = 'none';
+        elements.listHeader.style.display = 'none';
         elements.noResults.style.display = 'flex';
         elements.paginationContainer.style.display = 'none';
         return;
     }
     
     elements.noResults.style.display = 'none';
-    elements.resultsGrid.style.display = 'grid';
+    elements.resultsGrid.style.display = 'flex';
+    elements.listHeader.style.display = 'flex';
     elements.paginationContainer.style.display = 'flex';
     
     elements.resultsGrid.innerHTML = students.map(student => createStudentCard(student)).join('');
@@ -388,41 +391,50 @@ function createStudentCard(student) {
     
     return `
         <div class="student-card">
-            <div class="student-header">
-                <div class="student-avatar">${initials}</div>
-                <div class="student-info">
+            <div class="student-avatar">${initials}</div>
+            <div class="student-info">
+                <div class="student-name-section">
                     <div class="student-name">${student.apellidos}, ${student.nombres}</div>
-                    <div class="student-details">
-                        <div class="detail-item">
-                            <span class="material-icons">badge</span>
-                            <span>DNI: ${student.dni}</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="material-icons">cake</span>
-                            <span>${age} años</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="material-icons">person</span>
-                            <span>${student.sexo === 'M' ? 'Masculino' : 'Femenino'}</span>
-                        </div>
-                        ${student.apoderado ? `
-                        <div class="detail-item">
-                            <span class="material-icons">family_restroom</span>
-                            <span>${student.apoderado.nombres} ${student.apoderado.apellidos}</span>
-                        </div>
-                        ` : ''}
-                        ${student.direccion ? `
-                        <div class="detail-item">
-                            <span class="material-icons">location_on</span>
-                            <span>${student.direccion.distrito}</span>
-                        </div>
-                        ` : ''}
+                    <div class="student-dni">
+                        <span class="material-icons" style="font-size: 14px;">badge</span>
+                        <span>${student.dni}</span>
                     </div>
                 </div>
-            </div>
-            <div class="student-badges">
-                <span class="badge">${student.grado}</span>
-                <span class="badge section">${student.seccion}</span>
+                
+                <div class="student-personal-info">
+                    <div class="student-age">${age} años</div>
+                    <div class="student-gender">${student.sexo === 'M' ? 'M' : 'F'}</div>
+                </div>
+                
+                <div class="student-academic">
+                    <div class="student-grade-section">
+                        <span class="badge">${student.grado}</span>
+                        <span class="badge section">${student.seccion}</span>
+                    </div>
+                </div>
+                
+                <div class="student-apoderado">
+                    ${student.apoderado ? `
+                        <div class="apoderado-name">${student.apoderado.nombres} ${student.apoderado.apellidos}</div>
+                        <div class="apoderado-contact">
+                            <span class="material-icons" style="font-size: 12px;">phone</span>
+                            <span>${student.apoderado.celular || 'Sin teléfono'}</span>
+                        </div>
+                    ` : `
+                        <div class="apoderado-name">Sin apoderado</div>
+                        <div class="apoderado-contact">-</div>
+                    `}
+                </div>
+                
+                <div class="student-location">
+                    ${student.direccion ? `
+                        <div class="location-district">${student.direccion.distrito}</div>
+                        <div class="location-province">${student.direccion.provincia}</div>
+                    ` : `
+                        <div class="location-district">Sin dirección</div>
+                        <div class="location-province">-</div>
+                    `}
+                </div>
             </div>
         </div>
     `;
@@ -576,7 +588,8 @@ function formatDate(dateString) {
 // Mostrar/ocultar loading
 function showLoading(show) {
     elements.loadingSpinner.classList.toggle('show', show);
-    elements.resultsGrid.style.display = show ? 'none' : 'grid';
+    elements.resultsGrid.style.display = show ? 'none' : 'flex';
+    elements.listHeader.style.display = show ? 'none' : 'flex';
 }
 
 // Mostrar error
