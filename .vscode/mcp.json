@@ -1,0 +1,8 @@
+{
+    "servers": {
+        "sqlite-query": {
+            "command": "mcp-sqlite-tool",
+            "type": "stdio"
+        }
+    }
+}
