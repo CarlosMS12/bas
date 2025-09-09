@@ -48,6 +48,7 @@ const elements = {
     modalContent: document.getElementById('modalContent'),
     modalFooter: document.getElementById('modalFooter'),
     editToggleBtn: document.getElementById('editToggleBtn'),
+    deleteStudentBtn: document.getElementById('deleteStudentBtn'),
     cancelEditBtn: document.getElementById('cancelEditBtn'),
     saveEditBtn: document.getElementById('saveEditBtn'),
     listHeader: document.getElementById('listHeader'),
@@ -253,6 +254,7 @@ function setupEventListeners() {
     // Modal
     elements.modalClose.addEventListener('click', closeModal);
     elements.editToggleBtn.addEventListener('click', toggleEditMode);
+    elements.deleteStudentBtn.addEventListener('click', deleteStudent);
     elements.cancelEditBtn.addEventListener('click', cancelEdit);
     elements.saveEditBtn.addEventListener('click', saveChanges);
     elements.modalOverlay.addEventListener('click', function(e) {
@@ -562,6 +564,7 @@ function showStudentDetails(student) {
     
     // Reset UI state
     elements.editToggleBtn.classList.remove('editing');
+    elements.deleteStudentBtn.style.display = 'flex'; // Asegurar que el botón eliminar esté visible
     elements.modalFooter.style.display = 'none';
     
     renderStudentDetails(false);
@@ -762,6 +765,7 @@ function toggleEditMode() {
     
     if (isEditMode) {
         elements.editToggleBtn.classList.add('editing');
+        elements.deleteStudentBtn.style.display = 'none'; // Ocultar botón eliminar en modo edición
         elements.modalFooter.style.display = 'flex';
         renderStudentDetails(true);
     } else {
@@ -773,6 +777,7 @@ function toggleEditMode() {
 function cancelEdit() {
     isEditMode = false;
     elements.editToggleBtn.classList.remove('editing');
+    elements.deleteStudentBtn.style.display = 'flex'; // Mostrar botón eliminar
     elements.modalFooter.style.display = 'none';
     
     // Restore original data
@@ -1288,6 +1293,65 @@ async function saveNewStudent() {
         elements.saveAddBtn.innerHTML = `
             <span class="material-icons">person_add</span>
             Agregar Estudiante
+        `;
+    }
+}
+
+// ========================================
+// FUNCIONALIDAD DE ELIMINAR ESTUDIANTE
+// ========================================
+
+// Eliminar estudiante
+async function deleteStudent() {
+    if (!currentStudent) {
+        showError('No hay estudiante seleccionado');
+        return;
+    }
+    
+    // Mostrar modal de confirmación
+    const studentName = `${currentStudent.nombres} ${currentStudent.apellidos}`;
+    const confirmMessage = `¿Estás seguro de que deseas eliminar permanentemente a:\n\n${studentName}\n\nEsta acción no se puede deshacer y eliminará todos los datos relacionados (apoderado y dirección).`;
+    
+    if (!confirm(confirmMessage)) {
+        return;
+    }
+    
+    try {
+        // Mostrar estado de carga
+        elements.deleteStudentBtn.disabled = true;
+        elements.deleteStudentBtn.innerHTML = `
+            <span class="material-icons">hourglass_empty</span>
+            <span class="btn-text">Eliminando...</span>
+        `;
+        
+        const response = await fetch(`${API_BASE_URL}/students/${currentStudent.id}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al eliminar estudiante');
+        }
+        
+        const result = await response.json();
+        showSuccess(`Estudiante ${studentName} eliminado exitosamente`);
+        
+        // Cerrar modal y actualizar lista
+        closeModal();
+        await loadStudents();
+        
+    } catch (error) {
+        console.error('Error deleting student:', error);
+        showError('Error al eliminar estudiante: ' + error.message);
+    } finally {
+        // Restaurar estado del botón
+        elements.deleteStudentBtn.disabled = false;
+        elements.deleteStudentBtn.innerHTML = `
+            <span class="material-icons">delete</span>
+            <span class="btn-text">Eliminar</span>
         `;
     }
 }

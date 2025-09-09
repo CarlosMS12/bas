@@ -624,6 +624,98 @@ app.put('/api/direcciones/:id', (req, res) => {
     });
 });
 
+// API para eliminar un estudiante
+app.delete('/api/students/:id', (req, res) => {
+    const studentId = req.params.id;
+    
+    // Primero, obtener información del estudiante para eliminar registros relacionados
+    const getStudentQuery = `
+        SELECT apoderado_id, direccion_id 
+        FROM estudiantes 
+        WHERE id = ?
+    `;
+    
+    db.get(getStudentQuery, [studentId], (err, student) => {
+        if (err) {
+            console.error('Error al obtener estudiante para eliminar:', err.message);
+            res.status(500).json({ error: 'Error interno del servidor' });
+            return;
+        }
+        
+        if (!student) {
+            res.status(404).json({ error: 'Estudiante no encontrado' });
+            return;
+        }
+        
+        // Iniciar transacción para eliminar todos los registros relacionados
+        db.serialize(() => {
+            db.run('BEGIN TRANSACTION');
+            
+            // Eliminar estudiante
+            db.run('DELETE FROM estudiantes WHERE id = ?', [studentId], function(err) {
+                if (err) {
+                    console.error('Error al eliminar estudiante:', err.message);
+                    db.run('ROLLBACK');
+                    res.status(500).json({ error: 'Error interno del servidor' });
+                    return;
+                }
+                
+                let deletedRecords = this.changes;
+                let completedDeletions = 0;
+                let totalDeletions = 1; // Solo el estudiante es obligatorio
+                
+                // Eliminar apoderado si existe
+                if (student.apoderado_id) {
+                    totalDeletions++;
+                    db.run('DELETE FROM apoderados WHERE id = ?', [student.apoderado_id], function(err) {
+                        if (err) {
+                            console.error('Error al eliminar apoderado:', err.message);
+                        }
+                        completedDeletions++;
+                        if (completedDeletions === totalDeletions - 1) {
+                            finalizeDeletion();
+                        }
+                    });
+                }
+                
+                // Eliminar dirección si existe
+                if (student.direccion_id) {
+                    totalDeletions++;
+                    db.run('DELETE FROM direcciones WHERE id = ?', [student.direccion_id], function(err) {
+                        if (err) {
+                            console.error('Error al eliminar dirección:', err.message);
+                        }
+                        completedDeletions++;
+                        if (completedDeletions === totalDeletions - 1) {
+                            finalizeDeletion();
+                        }
+                    });
+                }
+                
+                // Si no hay registros relacionados para eliminar
+                if (totalDeletions === 1) {
+                    finalizeDeletion();
+                }
+                
+                function finalizeDeletion() {
+                    db.run('COMMIT', (err) => {
+                        if (err) {
+                            console.error('Error al confirmar transacción:', err.message);
+                            res.status(500).json({ error: 'Error interno del servidor' });
+                            return;
+                        }
+                        
+                        res.json({ 
+                            message: 'Estudiante eliminado exitosamente',
+                            deletedRecords: deletedRecords
+                        });
+                    });
+                }
+            });
+        });
+    });
+});
+
 // API para obtener grados disponibles
 app.get('/api/grados', (req, res) => {
     const query = `SELECT DISTINCT grado FROM aulas ORDER BY grado`;

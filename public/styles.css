@@ -731,7 +731,6 @@ body {
 .modal-actions {
     display: flex;
     gap: var(--spacing-sm);
-    align-items: center;
 }
 
 .edit-toggle-btn {
@@ -763,6 +762,29 @@ body {
 
 .edit-toggle-btn.editing::after {
     content: 'Cancelar';
+}
+
+.delete-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    background: var(--error-color);
+    color: white;
+    border: none;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    font-size: var(--font-sm);
+    transition: background-color 0.2s;
+}
+
+.delete-btn:hover {
+    background: #d32f2f;
+}
+
+.delete-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 .modal-close {
