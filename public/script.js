@@ -3,6 +3,14 @@ const API_BASE_URL = '/api';
 
 // Estado global de la aplicación
 let allStudents = [];
+let currentStudent = null;
+let isEditMode = false;
+let originalData = null;
+
+// Datos de opciones disponibles
+let availableGrados = [];
+let availableSecciones = [];
+
 let currentPagination = {
     page: 1,
     limit: 24,
@@ -38,6 +46,10 @@ const elements = {
     modalOverlay: document.getElementById('modalOverlay'),
     modalClose: document.getElementById('modalClose'),
     modalContent: document.getElementById('modalContent'),
+    modalFooter: document.getElementById('modalFooter'),
+    editToggleBtn: document.getElementById('editToggleBtn'),
+    cancelEditBtn: document.getElementById('cancelEditBtn'),
+    saveEditBtn: document.getElementById('saveEditBtn'),
     listHeader: document.getElementById('listHeader'),
     
     // Elementos de paginación
@@ -61,7 +73,7 @@ async function initializeApp() {
         showLoading(true);
         
         // Cargar datos iniciales
-        await loadStudents();
+        await loadInitialData();
         await loadFilterOptions();
         
         // Configurar event listeners
@@ -72,6 +84,56 @@ async function initializeApp() {
         console.error('Error initializing app:', error);
         showError('Error al cargar la aplicación');
         showLoading(false);
+    }
+}
+
+// Cargar datos iniciales
+async function loadInitialData() {
+    try {
+        // Cargar grados y secciones disponibles
+        await Promise.all([
+            loadAvailableGrados(),
+            loadAvailableSecciones()
+        ]);
+        
+        // Cargar estudiantes
+        await loadStudents();
+        
+        // Configurar el estado inicial de filtros
+        clearAllFilters();
+        
+        console.log('Datos iniciales cargados correctamente');
+    } catch (error) {
+        console.error('Error al cargar datos iniciales:', error);
+        showError('Error al cargar los datos iniciales');
+    }
+}
+
+// Cargar grados disponibles
+async function loadAvailableGrados() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/grados`);
+        if (!response.ok) throw new Error('Error al cargar grados');
+        
+        availableGrados = await response.json();
+        console.log('Grados cargados:', availableGrados);
+    } catch (error) {
+        console.error('Error al cargar grados:', error);
+        availableGrados = [];
+    }
+}
+
+// Cargar secciones disponibles
+async function loadAvailableSecciones() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/secciones`);
+        if (!response.ok) throw new Error('Error al cargar secciones');
+        
+        availableSecciones = await response.json();
+        console.log('Secciones cargadas:', availableSecciones);
+    } catch (error) {
+        console.error('Error al cargar secciones:', error);
+        availableSecciones = [];
     }
 }
 
@@ -182,6 +244,9 @@ function setupEventListeners() {
     
     // Modal
     elements.modalClose.addEventListener('click', closeModal);
+    elements.editToggleBtn.addEventListener('click', toggleEditMode);
+    elements.cancelEditBtn.addEventListener('click', cancelEdit);
+    elements.saveEditBtn.addEventListener('click', saveChanges);
     elements.modalOverlay.addEventListener('click', function(e) {
         if (e.target === elements.modalOverlay) {
             closeModal();
@@ -450,8 +515,12 @@ function getInitials(nombres, apellidos) {
 // Calcular edad
 function calculateAge(birthDate) {
     if (!birthDate) return 'N/A';
-    const birth = new Date(birthDate);
+    
+    // Parse the date manually to avoid timezone issues
+    const [year, month, day] = birthDate.split('-').map(num => parseInt(num, 10));
+    const birth = new Date(year, month - 1, day); // month is 0-indexed
     const today = new Date();
+    
     let age = today.getFullYear() - birth.getFullYear();
     const monthDiff = today.getMonth() - birth.getMonth();
     
@@ -464,6 +533,23 @@ function calculateAge(birthDate) {
 
 // Mostrar detalles del estudiante en modal
 function showStudentDetails(student) {
+    currentStudent = student;
+    isEditMode = false;
+    originalData = JSON.parse(JSON.stringify(student)); // Deep copy
+    
+    // Reset UI state
+    elements.editToggleBtn.classList.remove('editing');
+    elements.modalFooter.style.display = 'none';
+    
+    renderStudentDetails(false);
+    
+    elements.modalOverlay.classList.add('show');
+    document.body.style.overflow = 'hidden';
+}
+
+// Renderizar detalles del estudiante
+function renderStudentDetails(editMode = false) {
+    const student = currentStudent;
     const age = calculateAge(student.fecha_nacimiento);
     
     elements.modalContent.innerHTML = `
@@ -472,19 +558,31 @@ function showStudentDetails(student) {
             <div class="detail-grid">
                 <div class="detail-field">
                     <label>Nombres</label>
-                    <span>${student.nombres || 'N/A'}</span>
+                    ${editMode ? 
+                        `<input type="text" value="${student.nombres || ''}" name="nombres" required>` :
+                        `<span>${student.nombres || 'N/A'}</span>`
+                    }
                 </div>
                 <div class="detail-field">
                     <label>Apellidos</label>
-                    <span>${student.apellidos || 'N/A'}</span>
+                    ${editMode ? 
+                        `<input type="text" value="${student.apellidos || ''}" name="apellidos" required>` :
+                        `<span>${student.apellidos || 'N/A'}</span>`
+                    }
                 </div>
                 <div class="detail-field">
                     <label>DNI</label>
-                    <span>${student.dni || 'N/A'}</span>
+                    ${editMode ? 
+                        `<input type="text" value="${student.dni || ''}" name="dni" maxlength="12" pattern="[0-9A-Za-z]{1,12}" required>` :
+                        `<span>${student.dni || 'N/A'}</span>`
+                    }
                 </div>
                 <div class="detail-field">
                     <label>Fecha de Nacimiento</label>
-                    <span>${formatDate(student.fecha_nacimiento)}</span>
+                    ${editMode ? 
+                        `<input type="date" value="${student.fecha_nacimiento || ''}" name="fecha_nacimiento">` :
+                        `<span>${formatDate(student.fecha_nacimiento)}</span>`
+                    }
                 </div>
                 <div class="detail-field">
                     <label>Edad</label>
@@ -492,20 +590,45 @@ function showStudentDetails(student) {
                 </div>
                 <div class="detail-field">
                     <label>Sexo</label>
-                    <span>${student.sexo === 'M' ? 'Masculino' : 'Femenino'}</span>
+                    ${editMode ? 
+                        `<select name="sexo" required>
+                            <option value="M" ${student.sexo === 'M' ? 'selected' : ''}>Masculino</option>
+                            <option value="F" ${student.sexo === 'F' ? 'selected' : ''}>Femenino</option>
+                        </select>` :
+                        `<span>${student.sexo === 'M' ? 'Masculino' : 'Femenino'}</span>`
+                    }
                 </div>
                 <div class="detail-field">
                     <label>Grado</label>
-                    <span>${student.grado || 'N/A'}</span>
+                    ${editMode ? 
+                        `<select name="grado" required>
+                            <option value="">Seleccionar grado...</option>
+                            ${availableGrados.map(g => 
+                                `<option value="${g.grado}" ${student.grado === g.grado ? 'selected' : ''}>${g.grado}</option>`
+                            ).join('')}
+                        </select>` :
+                        `<span>${student.grado || 'N/A'}</span>`
+                    }
                 </div>
                 <div class="detail-field">
                     <label>Sección</label>
-                    <span>${student.seccion || 'N/A'}</span>
+                    ${editMode ? 
+                        `<select name="seccion" required>
+                            <option value="">Seleccionar sección...</option>
+                            ${availableSecciones.map(s => 
+                                `<option value="${s.seccion}" ${student.seccion === s.seccion ? 'selected' : ''}>${s.seccion}</option>`
+                            ).join('')}
+                        </select>` :
+                        `<span>${student.seccion || 'N/A'}</span>`
+                    }
                 </div>
-                ${student.discapacidad ? `
+                ${student.discapacidad || editMode ? `
                 <div class="detail-field">
                     <label>Discapacidad</label>
-                    <span>${student.discapacidad}</span>
+                    ${editMode ? 
+                        `<input type="text" value="${student.discapacidad || ''}" name="discapacidad">` :
+                        `<span>${student.discapacidad || 'Ninguna'}</span>`
+                    }
                 </div>
                 ` : ''}
             </div>
@@ -517,23 +640,38 @@ function showStudentDetails(student) {
             <div class="detail-grid">
                 <div class="detail-field">
                     <label>Nombres</label>
-                    <span>${student.apoderado.nombres || 'N/A'}</span>
+                    ${editMode ? 
+                        `<input type="text" value="${student.apoderado.nombres || ''}" name="apoderado_nombres" required>` :
+                        `<span>${student.apoderado.nombres || 'N/A'}</span>`
+                    }
                 </div>
                 <div class="detail-field">
                     <label>Apellidos</label>
-                    <span>${student.apoderado.apellidos || 'N/A'}</span>
+                    ${editMode ? 
+                        `<input type="text" value="${student.apoderado.apellidos || ''}" name="apoderado_apellidos" required>` :
+                        `<span>${student.apoderado.apellidos || 'N/A'}</span>`
+                    }
                 </div>
                 <div class="detail-field">
                     <label>DNI</label>
-                    <span>${student.apoderado.dni || 'N/A'}</span>
+                    ${editMode ? 
+                        `<input type="text" value="${student.apoderado.dni || ''}" name="apoderado_dni" maxlength="12" pattern="[0-9A-Za-z]{1,12}" required>` :
+                        `<span>${student.apoderado.dni || 'N/A'}</span>`
+                    }
                 </div>
                 <div class="detail-field">
                     <label>Fecha de Nacimiento</label>
-                    <span>${formatDate(student.apoderado.fecha_nacimiento)}</span>
+                    ${editMode ? 
+                        `<input type="date" value="${student.apoderado.fecha_nacimiento || ''}" name="apoderado_fecha_nacimiento">` :
+                        `<span>${formatDate(student.apoderado.fecha_nacimiento)}</span>`
+                    }
                 </div>
                 <div class="detail-field">
                     <label>Celular</label>
-                    <span>${student.apoderado.celular || 'N/A'}</span>
+                    ${editMode ? 
+                        `<input type="text" value="${student.apoderado.celular || ''}" name="apoderado_celular" maxlength="50" placeholder="Ej: 987654321, 123456789, 555666777">` :
+                        `<span>${student.apoderado.celular || 'N/A'}</span>`
+                    }
                 </div>
             </div>
         </div>
@@ -545,39 +683,298 @@ function showStudentDetails(student) {
             <div class="detail-grid">
                 <div class="detail-field">
                     <label>Departamento</label>
-                    <span>${student.direccion.departamento || 'N/A'}</span>
+                    ${editMode ? 
+                        `<input type="text" value="${student.direccion.departamento || ''}" name="direccion_departamento">` :
+                        `<span>${student.direccion.departamento || 'N/A'}</span>`
+                    }
                 </div>
                 <div class="detail-field">
                     <label>Provincia</label>
-                    <span>${student.direccion.provincia || 'N/A'}</span>
+                    ${editMode ? 
+                        `<input type="text" value="${student.direccion.provincia || ''}" name="direccion_provincia">` :
+                        `<span>${student.direccion.provincia || 'N/A'}</span>`
+                    }
                 </div>
                 <div class="detail-field">
                     <label>Distrito</label>
-                    <span>${student.direccion.distrito || 'N/A'}</span>
+                    ${editMode ? 
+                        `<input type="text" value="${student.direccion.distrito || ''}" name="direccion_distrito">` :
+                        `<span>${student.direccion.distrito || 'N/A'}</span>`
+                    }
                 </div>
                 <div class="detail-field">
                     <label>Domicilio</label>
-                    <span>${student.direccion.domicilio || 'N/A'}</span>
+                    ${editMode ? 
+                        `<input type="text" value="${student.direccion.domicilio || ''}" name="direccion_domicilio">` :
+                        `<span>${student.direccion.domicilio || 'N/A'}</span>`
+                    }
                 </div>
             </div>
         </div>
         ` : ''}
     `;
-    
-    elements.modalOverlay.classList.add('show');
-    document.body.style.overflow = 'hidden';
 }
 
 // Cerrar modal
 function closeModal() {
+    if (isEditMode) {
+        const confirmClose = confirm('¿Estás seguro de que deseas cerrar? Se perderán los cambios no guardados.');
+        if (!confirmClose) return;
+    }
+    
     elements.modalOverlay.classList.remove('show');
     document.body.style.overflow = 'auto';
+    
+    // Reset state
+    currentStudent = null;
+    isEditMode = false;
+    originalData = null;
+    elements.editToggleBtn.classList.remove('editing');
+    elements.modalFooter.style.display = 'none';
+}
+
+// Toggle edit mode
+function toggleEditMode() {
+    isEditMode = !isEditMode;
+    
+    if (isEditMode) {
+        elements.editToggleBtn.classList.add('editing');
+        elements.modalFooter.style.display = 'flex';
+        renderStudentDetails(true);
+    } else {
+        cancelEdit();
+    }
+}
+
+// Cancelar edición
+function cancelEdit() {
+    isEditMode = false;
+    elements.editToggleBtn.classList.remove('editing');
+    elements.modalFooter.style.display = 'none';
+    
+    // Restore original data
+    currentStudent = JSON.parse(JSON.stringify(originalData));
+    renderStudentDetails(false);
+}
+
+// Guardar cambios
+async function saveChanges() {
+    try {
+        elements.saveEditBtn.disabled = true;
+        elements.saveEditBtn.textContent = 'Guardando...';
+        
+        // Collect form data
+        const formData = collectFormData();
+        
+        // Validate data
+        if (!validateFormData(formData)) {
+            return;
+        }
+        
+        // Update student data
+        await updateStudentData(formData);
+        
+        // Update UI
+        isEditMode = false;
+        elements.editToggleBtn.classList.remove('editing');
+        elements.modalFooter.style.display = 'none';
+        
+        // Refresh data
+        await loadStudents(currentPagination.page, currentPagination.limit);
+        
+        // Show success message
+        showSuccess('Datos actualizados exitosamente');
+        
+        // Update modal content with new data
+        const updatedStudent = allStudents.find(s => s.id === currentStudent.id);
+        if (updatedStudent) {
+            currentStudent = updatedStudent;
+            originalData = JSON.parse(JSON.stringify(updatedStudent));
+            renderStudentDetails(false);
+        }
+        
+    } catch (error) {
+        console.error('Error saving changes:', error);
+        showError('Error al guardar los cambios: ' + error.message);
+    } finally {
+        elements.saveEditBtn.disabled = false;
+        elements.saveEditBtn.innerHTML = '<span class="material-icons">save</span>Guardar Cambios';
+    }
+}
+
+// Recopilar datos del formulario
+function collectFormData() {
+    const inputs = elements.modalContent.querySelectorAll('input, select');
+    const data = {};
+    
+    inputs.forEach(input => {
+        const name = input.name;
+        const value = input.value.trim();
+        
+        if (name.startsWith('apoderado_')) {
+            const field = name.replace('apoderado_', '');
+            if (!data.apoderado) data.apoderado = {};
+            data.apoderado[field] = value;
+        } else if (name.startsWith('direccion_')) {
+            const field = name.replace('direccion_', '');
+            if (!data.direccion) data.direccion = {};
+            data.direccion[field] = value;
+        } else {
+            data[name] = value;
+        }
+    });
+    
+    return data;
+}
+
+// Validar datos del formulario
+function validateFormData(data) {
+    // Clear previous errors
+    document.querySelectorAll('.field-error').forEach(el => el.classList.remove('field-error'));
+    document.querySelectorAll('.form-error').forEach(el => el.remove());
+    
+    let isValid = true;
+    
+    // Validate required fields
+    const requiredFields = ['nombres', 'apellidos', 'dni', 'sexo'];
+    requiredFields.forEach(field => {
+        if (!data[field] || data[field].length === 0) {
+            showFieldError(field, 'Este campo es requerido');
+            isValid = false;
+        }
+    });
+    
+    // Validate DNI format (8-12 characters, numbers and letters for foreign documents)
+    if (data.dni && !/^[0-9A-Za-z]{1,12}$/.test(data.dni)) {
+        showFieldError('dni', 'DNI debe tener entre 1 y 12 caracteres (números y letras)');
+        isValid = false;
+    }
+    
+    // Validate apoderado DNI if exists
+    if (data.apoderado && data.apoderado.dni && !/^[0-9A-Za-z]{1,12}$/.test(data.apoderado.dni)) {
+        showFieldError('apoderado_dni', 'DNI debe tener entre 1 y 12 caracteres (números y letras)');
+        isValid = false;
+    }
+    
+    // Validate phone number if exists (now allows multiple numbers separated by commas, spaces, or other separators)
+    if (data.apoderado && data.apoderado.celular && data.apoderado.celular.length > 50) {
+        showFieldError('apoderado_celular', 'Campo de celular demasiado largo (máximo 50 caracteres)');
+        isValid = false;
+    }
+    
+    return isValid;
+}
+
+// Mostrar error en campo específico
+function showFieldError(fieldName, message) {
+    const input = document.querySelector(`input[name="${fieldName}"], select[name="${fieldName}"]`);
+    if (input) {
+        input.classList.add('field-error');
+        
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'form-error';
+        errorDiv.textContent = message;
+        input.parentNode.appendChild(errorDiv);
+    }
+}
+
+// Actualizar datos del estudiante
+async function updateStudentData(formData) {
+    const promises = [];
+    
+    // Update student
+    const studentData = {
+        nombres: formData.nombres,
+        apellidos: formData.apellidos,
+        dni: formData.dni,
+        fecha_nacimiento: formData.fecha_nacimiento || null,
+        sexo: formData.sexo,
+        discapacidad: formData.discapacidad || null,
+        grado: formData.grado || null,
+        seccion: formData.seccion || null
+    };
+    
+    promises.push(
+        fetch(`${API_BASE_URL}/students/${currentStudent.id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(studentData)
+        })
+    );
+    
+    // Update apoderado if exists and has valid ID
+    if (currentStudent.apoderado && formData.apoderado && currentStudent.apoderado.id) {
+        const apoderadoData = {
+            nombres: formData.apoderado.nombres,
+            apellidos: formData.apoderado.apellidos,
+            dni: formData.apoderado.dni,
+            fecha_nacimiento: formData.apoderado.fecha_nacimiento || null,
+            celular: formData.apoderado.celular || null
+        };
+        
+        promises.push(
+            fetch(`${API_BASE_URL}/apoderados/${currentStudent.apoderado.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(apoderadoData)
+            })
+        );
+    }
+    
+    // Update direccion if exists and has valid ID
+    if (currentStudent.direccion && formData.direccion && (currentStudent.direccion.id || currentStudent.direccion_id)) {
+        const direccionId = currentStudent.direccion.id || currentStudent.direccion_id;
+        
+        // Only update if we have some direccion data to update
+        const hasData = formData.direccion.departamento || 
+                       formData.direccion.provincia || 
+                       formData.direccion.distrito || 
+                       formData.direccion.domicilio;
+        
+        if (hasData) {
+            const direccionData = {
+                departamento: formData.direccion.departamento || null,
+                provincia: formData.direccion.provincia || null,
+                distrito: formData.direccion.distrito || null,
+                domicilio: formData.direccion.domicilio || null
+            };
+            
+            promises.push(
+                fetch(`${API_BASE_URL}/direcciones/${direccionId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(direccionData)
+                })
+            );
+        }
+    }
+    
+    // Wait for all updates
+    const responses = await Promise.all(promises);
+    
+    // Check if all requests were successful
+    for (const response of responses) {
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al actualizar datos');
+        }
+    }
 }
 
 // Formatear fecha
 function formatDate(dateString) {
     if (!dateString) return 'N/A';
-    const date = new Date(dateString);
+    
+    // Parse the date manually to avoid timezone issues
+    const [year, month, day] = dateString.split('-').map(num => parseInt(num, 10));
+    const date = new Date(year, month - 1, day); // month is 0-indexed
+    
     return date.toLocaleDateString('es-ES', {
         year: 'numeric',
         month: 'long',
@@ -594,27 +991,44 @@ function showLoading(show) {
 
 // Mostrar error
 function showError(message) {
-    // Crear notificación de error simple
-    const errorDiv = document.createElement('div');
-    errorDiv.style.cssText = `
+    showNotification(message, 'error');
+}
+
+// Mostrar éxito
+function showSuccess(message) {
+    showNotification(message, 'success');
+}
+
+// Mostrar notificación
+function showNotification(message, type = 'error') {
+    const notificationDiv = document.createElement('div');
+    notificationDiv.style.cssText = `
         position: fixed;
         top: 20px;
         right: 20px;
-        background: var(--error-color);
+        background: ${type === 'success' ? '#4caf50' : 'var(--error-color)'};
         color: white;
         padding: 16px 24px;
         border-radius: 8px;
         box-shadow: var(--shadow-2);
         z-index: 1001;
         font-family: var(--font-family);
+        display: flex;
+        align-items: center;
+        gap: 8px;
     `;
-    errorDiv.textContent = message;
     
-    document.body.appendChild(errorDiv);
+    const icon = type === 'success' ? 'check_circle' : 'error';
+    notificationDiv.innerHTML = `
+        <span class="material-icons" style="font-size: 20px;">${icon}</span>
+        <span>${message}</span>
+    `;
+    
+    document.body.appendChild(notificationDiv);
     
     setTimeout(() => {
-        if (document.body.contains(errorDiv)) {
-            document.body.removeChild(errorDiv);
+        if (document.body.contains(notificationDiv)) {
+            document.body.removeChild(notificationDiv);
         }
     }, 5000);
 }

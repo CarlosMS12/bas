@@ -12,6 +12,9 @@
     <div class="app-container">
         <header class="app-header">
             <div class="header-content">
+                <div>
+                    <img class="logo-school" src="assets/logo.jpg" alt="Logo">
+                </div>
                 <div class="logo-section">
                     <span class="material-icons logo-icon">school</span>
                     <h1 class="app-title">Sistema de Estudiantes</h1>
@@ -148,12 +151,28 @@
         <div class="modal">
             <div class="modal-header">
                 <h3 id="modalTitle">Detalles del Estudiante</h3>
-                <button class="modal-close" id="modalClose">
-                    <span class="material-icons">close</span>
-                </button>
+                <div class="modal-actions">
+                    <button class="edit-toggle-btn" id="editToggleBtn">
+                        <span class="material-icons">edit</span>
+                        <span class="btn-text">Editar</span>
+                    </button>
+                    <button class="modal-close" id="modalClose">
+                        <span class="material-icons">close</span>
+                    </button>
+                </div>
             </div>
             <div class="modal-content" id="modalContent">
                 <!-- Contenido del modal se cargará aquí -->
+            </div>
+            <div class="modal-footer" id="modalFooter" style="display: none;">
+                <button class="cancel-btn" id="cancelEditBtn">
+                    <span class="material-icons">close</span>
+                    Cancelar
+                </button>
+                <button class="save-btn" id="saveEditBtn">
+                    <span class="material-icons">save</span>
+                    Guardar Cambios
+                </button>
             </div>
         </div>
     </div>

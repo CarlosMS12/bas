@@ -10,7 +10,7 @@
     --primary-color: #1976d2;
     --primary-light: #42a5f5;
     --primary-dark: #1565c0;
-    --secondary-color: #03dac6;
+    --secondary-color: #ffea3a;
     --background-color: #fafafa;
     --surface-color: #ffffff;
     --error-color: #b00020;
@@ -90,6 +90,10 @@ body {
     color: var(--primary-color);
 }
 
+.logo-school {
+    height: 90px;
+    object-fit: cover;
+}
 .app-title {
     font-size: 24px;
     font-weight: 600;
@@ -524,8 +528,7 @@ body {
 
 .header-content {
     flex: 1;
-    display: grid;
-    grid-template-columns: 2fr 1fr 1fr 1.5fr auto;
+    display: flex;
     gap: var(--spacing-md);
     align-items: center;
 }
@@ -725,6 +728,43 @@ body {
     color: var(--text-primary);
 }
 
+.modal-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    align-items: center;
+}
+
+.edit-toggle-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--primary-color);
+    color: var(--text-on-primary);
+    border: none;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    font-family: var(--font-family);
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+.edit-toggle-btn:hover {
+    background: var(--primary-dark);
+}
+
+.edit-toggle-btn.editing {
+    background: var(--error-color);
+}
+
+.edit-toggle-btn.editing .btn-text {
+    display: none;
+}
+
+.edit-toggle-btn.editing::after {
+    content: 'Cancelar';
+}
+
 .modal-close {
     background: none;
     border: none;
@@ -783,6 +823,94 @@ body {
     padding: var(--spacing-sm);
     background: #f5f5f5;
     border-radius: var(--border-radius);
+}
+
+.detail-field span {
+    font-size: 14px;
+    color: var(--text-primary);
+    padding: var(--spacing-sm);
+    background: #f5f5f5;
+    border-radius: var(--border-radius);
+}
+
+.detail-field input,
+.detail-field select {
+    font-size: 14px;
+    color: var(--text-primary);
+    padding: var(--spacing-sm);
+    border: 1px solid #e0e0e0;
+    border-radius: var(--border-radius);
+    background: var(--surface-color);
+    font-family: var(--font-family);
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.detail-field input:focus,
+.detail-field select:focus {
+    border-color: var(--primary-color);
+}
+
+.detail-field input[readonly] {
+    background: #f5f5f5;
+    color: var(--text-secondary);
+    cursor: not-allowed;
+}
+
+.modal-footer {
+    padding: var(--spacing-lg);
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-md);
+}
+
+.cancel-btn,
+.save-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: none;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    font-family: var(--font-family);
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+.cancel-btn {
+    background: #f5f5f5;
+    color: var(--text-secondary);
+}
+
+.cancel-btn:hover {
+    background: #e0e0e0;
+}
+
+.save-btn {
+    background: var(--primary-color);
+    color: var(--text-on-primary);
+}
+
+.save-btn:hover {
+    background: var(--primary-dark);
+}
+
+.save-btn:disabled {
+    background: #e0e0e0;
+    color: var(--text-hint);
+    cursor: not-allowed;
+}
+
+.form-error {
+    color: var(--error-color);
+    font-size: 12px;
+    margin-top: var(--spacing-xs);
+}
+
+.field-error {
+    border-color: var(--error-color) !important;
 }
 
 /* Responsive */

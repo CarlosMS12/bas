@@ -364,6 +364,198 @@ app.get('/api/search', (req, res) => {
     });
 });
 
+// API para actualizar un estudiante
+// API para actualizar un estudiante
+app.put('/api/students/:id', (req, res) => {
+    const studentId = req.params.id;
+    const { nombres, apellidos, dni, fecha_nacimiento, sexo, discapacidad, grado, seccion } = req.body;
+    
+    // Si se proporcionaron grado y sección, primero obtener el aula_id
+    if (grado && seccion) {
+        const aulaQuery = `SELECT id FROM aulas WHERE grado = ? AND seccion = ? LIMIT 1`;
+        
+        db.get(aulaQuery, [grado, seccion], (err, aulaRow) => {
+            if (err) {
+                console.error('Error al obtener aula:', err.message);
+                res.status(500).json({ error: 'Error interno del servidor' });
+                return;
+            }
+            
+            if (!aulaRow) {
+                res.status(400).json({ error: 'Combinación de grado y sección no válida' });
+                return;
+            }
+            
+            // Actualizar estudiante con el nuevo aula_id
+            const updateQuery = `
+                UPDATE estudiantes 
+                SET nombres = ?, apellidos = ?, dni = ?, fecha_nacimiento = ?, sexo = ?, discapacidad = ?, aula_id = ?
+                WHERE id = ?
+            `;
+            
+            db.run(updateQuery, [nombres, apellidos, dni, fecha_nacimiento, sexo, discapacidad, aulaRow.id, studentId], function(err) {
+                if (err) {
+                    console.error('Error al actualizar estudiante:', err.message);
+                    res.status(500).json({ error: 'Error interno del servidor' });
+                    return;
+                }
+                
+                if (this.changes === 0) {
+                    res.status(404).json({ error: 'Estudiante no encontrado' });
+                    return;
+                }
+                
+                res.json({ 
+                    message: 'Estudiante actualizado exitosamente',
+                    changes: this.changes 
+                });
+            });
+        });
+    } else {
+        // Actualizar sin cambiar el aula
+        const updateQuery = `
+            UPDATE estudiantes 
+            SET nombres = ?, apellidos = ?, dni = ?, fecha_nacimiento = ?, sexo = ?, discapacidad = ?
+            WHERE id = ?
+        `;
+        
+        db.run(updateQuery, [nombres, apellidos, dni, fecha_nacimiento, sexo, discapacidad, studentId], function(err) {
+            if (err) {
+                console.error('Error al actualizar estudiante:', err.message);
+                res.status(500).json({ error: 'Error interno del servidor' });
+                return;
+            }
+            
+            if (this.changes === 0) {
+                res.status(404).json({ error: 'Estudiante no encontrado' });
+                return;
+            }
+            
+            res.json({ 
+                message: 'Estudiante actualizado exitosamente',
+                changes: this.changes 
+            });
+        });
+    }
+});
+
+// API para actualizar un apoderado
+app.put('/api/apoderados/:id', (req, res) => {
+    const apoderadoId = req.params.id;
+    const { nombres, apellidos, dni, fecha_nacimiento, celular } = req.body;
+    
+    const query = `
+        UPDATE apoderados 
+        SET nombres = ?, apellidos = ?, dni = ?, fecha_nacimiento = ?, celular = ?
+        WHERE id = ?
+    `;
+    
+    db.run(query, [nombres, apellidos, dni, fecha_nacimiento, celular, apoderadoId], function(err) {
+        if (err) {
+            console.error('Error al actualizar apoderado:', err.message);
+            res.status(500).json({ error: 'Error interno del servidor' });
+            return;
+        }
+        
+        if (this.changes === 0) {
+            res.status(404).json({ error: 'Apoderado no encontrado' });
+            return;
+        }
+        
+        res.json({ 
+            message: 'Apoderado actualizado exitosamente',
+            changes: this.changes 
+        });
+    });
+});
+
+// API para actualizar una dirección
+app.put('/api/direcciones/:id', (req, res) => {
+    const direccionId = req.params.id;
+    const { departamento, provincia, distrito, domicilio } = req.body;
+    
+    const query = `
+        UPDATE direcciones 
+        SET departamento = ?, provincia = ?, distrito = ?, domicilio = ?
+        WHERE id = ?
+    `;
+    
+    db.run(query, [departamento, provincia, distrito, domicilio, direccionId], function(err) {
+        if (err) {
+            console.error('Error al actualizar dirección:', err.message);
+            res.status(500).json({ error: 'Error interno del servidor' });
+            return;
+        }
+        
+        if (this.changes === 0) {
+            res.status(404).json({ error: 'Dirección no encontrada' });
+            return;
+        }
+        
+        res.json({ 
+            message: 'Dirección actualizada exitosamente',
+            changes: this.changes 
+        });
+    });
+});
+
+// API para obtener grados disponibles
+app.get('/api/grados', (req, res) => {
+    const query = `SELECT DISTINCT grado FROM aulas ORDER BY grado`;
+    
+    db.all(query, [], (err, rows) => {
+        if (err) {
+            console.error('Error al obtener grados:', err.message);
+            res.status(500).json({ error: 'Error interno del servidor' });
+            return;
+        }
+        
+        res.json(rows);
+    });
+});
+
+// API para obtener secciones disponibles
+app.get('/api/secciones', (req, res) => {
+    const query = `SELECT DISTINCT seccion FROM aulas ORDER BY seccion`;
+    
+    db.all(query, [], (err, rows) => {
+        if (err) {
+            console.error('Error al obtener secciones:', err.message);
+            res.status(500).json({ error: 'Error interno del servidor' });
+            return;
+        }
+        
+        res.json(rows);
+    });
+});
+
+// API para obtener el aula_id basado en grado y sección
+app.get('/api/aula', (req, res) => {
+    const { grado, seccion } = req.query;
+    
+    if (!grado || !seccion) {
+        res.status(400).json({ error: 'Grado y sección son requeridos' });
+        return;
+    }
+    
+    const query = `SELECT id FROM aulas WHERE grado = ? AND seccion = ? LIMIT 1`;
+    
+    db.get(query, [grado, seccion], (err, row) => {
+        if (err) {
+            console.error('Error al obtener aula:', err.message);
+            res.status(500).json({ error: 'Error interno del servidor' });
+            return;
+        }
+        
+        if (!row) {
+            res.status(404).json({ error: 'Aula no encontrada' });
+            return;
+        }
+        
+        res.json({ aula_id: row.id });
+    });
+});
+
 // API para obtener estadísticas
 app.get('/api/stats', (req, res) => {
     const queries = {
