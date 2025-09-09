@@ -364,6 +364,131 @@ app.get('/api/search', (req, res) => {
     });
 });
 
+// API para crear un nuevo estudiante
+app.post('/api/students', (req, res) => {
+    const { nombres, apellidos, dni, fecha_nacimiento, sexo, discapacidad, grado, seccion, apoderado, direccion } = req.body;
+    
+    // Validar campos requeridos
+    if (!nombres || !apellidos || !dni || !sexo) {
+        res.status(400).json({ error: 'Los campos nombres, apellidos, DNI y sexo son obligatorios' });
+        return;
+    }
+    
+    // Si se proporcionaron grado y sección, obtener el aula_id
+    if (grado && seccion) {
+        const aulaQuery = `SELECT id FROM aulas WHERE grado = ? AND seccion = ? LIMIT 1`;
+        
+        db.get(aulaQuery, [grado, seccion], (err, aulaRow) => {
+            if (err) {
+                console.error('Error al obtener aula:', err.message);
+                res.status(500).json({ error: 'Error interno del servidor' });
+                return;
+            }
+            
+            if (!aulaRow) {
+                res.status(400).json({ error: 'Combinación de grado y sección no válida' });
+                return;
+            }
+            
+            createStudentWithData(aulaRow.id);
+        });
+    } else {
+        createStudentWithData(null);
+    }
+    
+    function createStudentWithData(aulaId) {
+        // Primero crear dirección si se proporciona
+        if (direccion && (direccion.departamento || direccion.provincia || direccion.distrito || direccion.domicilio)) {
+            const direccionQuery = `
+                INSERT INTO direcciones (departamento, provincia, distrito, domicilio)
+                VALUES (?, ?, ?, ?)
+            `;
+            
+            db.run(direccionQuery, [
+                direccion.departamento || null,
+                direccion.provincia || null,
+                direccion.distrito || null,
+                direccion.domicilio || null
+            ], function(err) {
+                if (err) {
+                    console.error('Error al crear dirección:', err.message);
+                    res.status(500).json({ error: 'Error interno del servidor' });
+                    return;
+                }
+                
+                const direccionId = this.lastID;
+                createApoderadoAndStudent(direccionId, aulaId);
+            });
+        } else {
+            createApoderadoAndStudent(null, aulaId);
+        }
+        
+        function createApoderadoAndStudent(direccionId, aulaId) {
+            // Crear apoderado si se proporciona
+            if (apoderado && (apoderado.nombres || apoderado.apellidos)) {
+                const apoderadoQuery = `
+                    INSERT INTO apoderados (nombres, apellidos, dni, fecha_nacimiento, celular)
+                    VALUES (?, ?, ?, ?, ?)
+                `;
+                
+                db.run(apoderadoQuery, [
+                    apoderado.nombres || null,
+                    apoderado.apellidos || null,
+                    apoderado.dni || null,
+                    apoderado.fecha_nacimiento || null,
+                    apoderado.celular || null
+                ], function(err) {
+                    if (err) {
+                        console.error('Error al crear apoderado:', err.message);
+                        res.status(500).json({ error: 'Error interno del servidor' });
+                        return;
+                    }
+                    
+                    const apoderadoId = this.lastID;
+                    createStudent(direccionId, apoderadoId, aulaId);
+                });
+            } else {
+                createStudent(direccionId, null, aulaId);
+            }
+        }
+        
+        function createStudent(direccionId, apoderadoId, aulaId) {
+            // Crear estudiante
+            const studentQuery = `
+                INSERT INTO estudiantes (nombres, apellidos, dni, fecha_nacimiento, sexo, discapacidad, aula_id, apoderado_id, direccion_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+            
+            db.run(studentQuery, [
+                nombres,
+                apellidos,
+                dni,
+                fecha_nacimiento || null,
+                sexo,
+                discapacidad || null,
+                aulaId,
+                apoderadoId,
+                direccionId
+            ], function(err) {
+                if (err) {
+                    console.error('Error al crear estudiante:', err.message);
+                    if (err.message.includes('UNIQUE constraint failed')) {
+                        res.status(400).json({ error: 'Ya existe un estudiante con este DNI' });
+                    } else {
+                        res.status(500).json({ error: 'Error interno del servidor' });
+                    }
+                    return;
+                }
+                
+                res.status(201).json({ 
+                    message: 'Estudiante creado exitosamente',
+                    studentId: this.lastID 
+                });
+            });
+        }
+    }
+});
+
 // API para actualizar un estudiante
 // API para actualizar un estudiante
 app.put('/api/students/:id', (req, res) => {

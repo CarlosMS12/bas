@@ -52,6 +52,14 @@ const elements = {
     saveEditBtn: document.getElementById('saveEditBtn'),
     listHeader: document.getElementById('listHeader'),
     
+    // Elementos del modal de agregar estudiante
+    addStudentBtn: document.getElementById('addStudentBtn'),
+    addStudentModal: document.getElementById('addStudentModal'),
+    addStudentModalClose: document.getElementById('addStudentModalClose'),
+    addStudentContent: document.getElementById('addStudentContent'),
+    cancelAddBtn: document.getElementById('cancelAddBtn'),
+    saveAddBtn: document.getElementById('saveAddBtn'),
+    
     // Elementos de paginación
     paginationContainer: document.getElementById('paginationContainer'),
     paginationInfo: document.getElementById('paginationInfo'),
@@ -253,10 +261,25 @@ function setupEventListeners() {
         }
     });
     
+    // Modal de agregar estudiante
+    elements.addStudentBtn.addEventListener('click', openAddStudentModal);
+    elements.addStudentModalClose.addEventListener('click', closeAddStudentModal);
+    elements.cancelAddBtn.addEventListener('click', closeAddStudentModal);
+    elements.saveAddBtn.addEventListener('click', saveNewStudent);
+    elements.addStudentModal.addEventListener('click', function(e) {
+        if (e.target === elements.addStudentModal) {
+            closeAddStudentModal();
+        }
+    });
+    
     // Teclas de escape para cerrar modal
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
-            closeModal();
+            if (elements.addStudentModal.classList.contains('show')) {
+                closeAddStudentModal();
+            } else {
+                closeModal();
+            }
         }
     });
 }
@@ -1031,4 +1054,240 @@ function showNotification(message, type = 'error') {
             document.body.removeChild(notificationDiv);
         }
     }, 5000);
+}
+
+// ========================================
+// FUNCIONALIDAD DE AGREGAR ESTUDIANTE
+// ========================================
+
+// Abrir modal de agregar estudiante
+function openAddStudentModal() {
+    console.log('Opening add student modal...');
+    renderAddStudentForm();
+    elements.addStudentModal.classList.add('show');
+    document.body.style.overflow = 'hidden';
+    console.log('Modal opened successfully');
+}
+
+// Cerrar modal de agregar estudiante
+function closeAddStudentModal() {
+    elements.addStudentModal.classList.remove('show');
+    document.body.style.overflow = '';
+}
+
+// Renderizar formulario de agregar estudiante
+function renderAddStudentForm() {
+    elements.addStudentContent.innerHTML = `
+        <div class="detail-section">
+            <h4>Información del Estudiante</h4>
+            <div class="detail-grid">
+                <div class="detail-field">
+                    <label for="add-nombres">Nombres *</label>
+                    <input type="text" id="add-nombres" name="nombres" required placeholder="Nombres del estudiante">
+                </div>
+                <div class="detail-field">
+                    <label for="add-apellidos">Apellidos *</label>
+                    <input type="text" id="add-apellidos" name="apellidos" required placeholder="Apellidos del estudiante">
+                </div>
+                <div class="detail-field">
+                    <label for="add-dni">DNI *</label>
+                    <input type="text" id="add-dni" name="dni" maxlength="12" pattern="[0-9A-Za-z]{1,12}" required placeholder="Documento de identidad">
+                </div>
+                <div class="detail-field">
+                    <label for="add-fecha-nacimiento">Fecha de Nacimiento</label>
+                    <input type="date" id="add-fecha-nacimiento" name="fecha_nacimiento">
+                </div>
+                <div class="detail-field">
+                    <label for="add-sexo">Sexo *</label>
+                    <select id="add-sexo" name="sexo" required>
+                        <option value="">Seleccionar sexo...</option>
+                        <option value="M">Masculino</option>
+                        <option value="F">Femenino</option>
+                    </select>
+                </div>
+                <div class="detail-field">
+                    <label for="add-grado">Grado</label>
+                    <select id="add-grado" name="grado">
+                        <option value="">Seleccionar grado...</option>
+                        ${availableGrados.map(g => 
+                            `<option value="${g.grado}">${g.grado}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+                <div class="detail-field">
+                    <label for="add-seccion">Sección</label>
+                    <select id="add-seccion" name="seccion">
+                        <option value="">Seleccionar sección...</option>
+                        ${availableSecciones.map(s => 
+                            `<option value="${s.seccion}">${s.seccion}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+                <div class="detail-field">
+                    <label for="add-discapacidad">Discapacidad</label>
+                    <input type="text" id="add-discapacidad" name="discapacidad" placeholder="Especificar si tiene alguna discapacidad">
+                </div>
+            </div>
+        </div>
+        
+        <div class="detail-section">
+            <h4>Información del Apoderado</h4>
+            <div class="detail-grid">
+                <div class="detail-field">
+                    <label for="add-apoderado-nombres">Nombres</label>
+                    <input type="text" id="add-apoderado-nombres" name="apoderado_nombres" placeholder="Nombres del apoderado">
+                </div>
+                <div class="detail-field">
+                    <label for="add-apoderado-apellidos">Apellidos</label>
+                    <input type="text" id="add-apoderado-apellidos" name="apoderado_apellidos" placeholder="Apellidos del apoderado">
+                </div>
+                <div class="detail-field">
+                    <label for="add-apoderado-dni">DNI</label>
+                    <input type="text" id="add-apoderado-dni" name="apoderado_dni" maxlength="12" pattern="[0-9A-Za-z]{1,12}" placeholder="Documento del apoderado">
+                </div>
+                <div class="detail-field">
+                    <label for="add-apoderado-fecha-nacimiento">Fecha de Nacimiento</label>
+                    <input type="date" id="add-apoderado-fecha-nacimiento" name="apoderado_fecha_nacimiento">
+                </div>
+                <div class="detail-field">
+                    <label for="add-apoderado-celular">Celular</label>
+                    <input type="text" id="add-apoderado-celular" name="apoderado_celular" maxlength="50" placeholder="Ej: 987654321, 123456789">
+                </div>
+            </div>
+        </div>
+        
+        <div class="detail-section">
+            <h4>Información de Dirección</h4>
+            <div class="detail-grid">
+                <div class="detail-field">
+                    <label for="add-direccion-departamento">Departamento</label>
+                    <input type="text" id="add-direccion-departamento" name="direccion_departamento" placeholder="Departamento">
+                </div>
+                <div class="detail-field">
+                    <label for="add-direccion-provincia">Provincia</label>
+                    <input type="text" id="add-direccion-provincia" name="direccion_provincia" placeholder="Provincia">
+                </div>
+                <div class="detail-field">
+                    <label for="add-direccion-distrito">Distrito</label>
+                    <input type="text" id="add-direccion-distrito" name="direccion_distrito" placeholder="Distrito">
+                </div>
+                <div class="detail-field">
+                    <label for="add-direccion-domicilio">Domicilio</label>
+                    <input type="text" id="add-direccion-domicilio" name="direccion_domicilio" placeholder="Dirección específica">
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Recopilar datos del formulario de agregar estudiante
+function collectAddStudentFormData() {
+    const inputs = elements.addStudentContent.querySelectorAll('input, select');
+    const data = {};
+    
+    inputs.forEach(input => {
+        const name = input.name;
+        const value = input.value.trim();
+        
+        if (name.startsWith('apoderado_')) {
+            const field = name.replace('apoderado_', '');
+            if (!data.apoderado) data.apoderado = {};
+            data.apoderado[field] = value || null;
+        } else if (name.startsWith('direccion_')) {
+            const field = name.replace('direccion_', '');
+            if (!data.direccion) data.direccion = {};
+            data.direccion[field] = value || null;
+        } else {
+            data[name] = value || null;
+        }
+    });
+    
+    return data;
+}
+
+// Validar datos del nuevo estudiante
+function validateAddStudentData(data) {
+    // Clear previous errors
+    document.querySelectorAll('.field-error').forEach(el => el.classList.remove('field-error'));
+    document.querySelectorAll('.form-error').forEach(el => el.remove());
+    
+    let isValid = true;
+    
+    // Validate required fields
+    const requiredFields = ['nombres', 'apellidos', 'dni', 'sexo'];
+    requiredFields.forEach(field => {
+        if (!data[field] || data[field].length === 0) {
+            showFieldError(field, 'Este campo es requerido');
+            isValid = false;
+        }
+    });
+    
+    // Validate DNI format
+    if (data.dni && !/^[0-9A-Za-z]{1,12}$/.test(data.dni)) {
+        showFieldError('dni', 'DNI debe tener entre 1 y 12 caracteres (números y letras)');
+        isValid = false;
+    }
+    
+    // Validate apoderado DNI if exists
+    if (data.apoderado && data.apoderado.dni && !/^[0-9A-Za-z]{1,12}$/.test(data.apoderado.dni)) {
+        showFieldError('apoderado_dni', 'DNI debe tener entre 1 y 12 caracteres (números y letras)');
+        isValid = false;
+    }
+    
+    // Validate phone number if exists
+    if (data.apoderado && data.apoderado.celular && data.apoderado.celular.length > 50) {
+        showFieldError('apoderado_celular', 'Campo de celular demasiado largo (máximo 50 caracteres)');
+        isValid = false;
+    }
+    
+    return isValid;
+}
+
+// Guardar nuevo estudiante
+async function saveNewStudent() {
+    try {
+        const formData = collectAddStudentFormData();
+        
+        if (!validateAddStudentData(formData)) {
+            return;
+        }
+        
+        // Show loading state
+        elements.saveAddBtn.disabled = true;
+        elements.saveAddBtn.innerHTML = `
+            <span class="material-icons">hourglass_empty</span>
+            Guardando...
+        `;
+        
+        const response = await fetch(`${API_BASE_URL}/students`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al crear estudiante');
+        }
+        
+        const result = await response.json();
+        showSuccess('Estudiante creado exitosamente');
+        
+        // Close modal and refresh data
+        closeAddStudentModal();
+        await loadStudents();
+        
+    } catch (error) {
+        console.error('Error saving new student:', error);
+        showError('Error al crear estudiante: ' + error.message);
+    } finally {
+        // Restore button state
+        elements.saveAddBtn.disabled = false;
+        elements.saveAddBtn.innerHTML = `
+            <span class="material-icons">person_add</span>
+            Agregar Estudiante
+        `;
+    }
 }

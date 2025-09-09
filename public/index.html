@@ -177,6 +177,38 @@
         </div>
     </div>
 
+    <!-- Botón flotante para agregar estudiante -->
+    <button class="fab-btn" id="addStudentBtn" title="Agregar nuevo estudiante">
+        <span class="material-icons">person_add</span>
+    </button>
+
+    <!-- Modal para agregar nuevo estudiante -->
+    <div class="modal-overlay" id="addStudentModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Agregar Nuevo Estudiante</h3>
+                <div class="modal-actions">
+                    <button class="modal-close" id="addStudentModalClose">
+                        <span class="material-icons">close</span>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-content" id="addStudentContent">
+                <!-- Contenido del formulario se cargará aquí -->
+            </div>
+            <div class="modal-footer">
+                <button class="cancel-btn" id="cancelAddBtn">
+                    <span class="material-icons">close</span>
+                    Cancelar
+                </button>
+                <button class="save-btn" id="saveAddBtn">
+                    <span class="material-icons">person_add</span>
+                    Agregar Estudiante
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="script.js"></script>
 </body>
 </html>
