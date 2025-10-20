@@ -32,9 +32,17 @@ Thumbs.db
 *.tmp
 *.temp
 
-# Base de datos de backup (mantener la original)
+# Base de datos SQLite (ahora usando Supabase)
+*.db
+*.sqlite
+*.sqlite3
 *.db.backup
 *.sqlite.backup
+
+# Archivos de backup
+*.bak
+*.backup
+*.old
 
 # Archivos de build/dist
 dist/

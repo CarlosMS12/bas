@@ -1,849 +1,624 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const cors = require('cors');
+const supabase = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// Conexión a la base de datos SQLite
-const dbPath = path.join(__dirname, 'estudiantes.db');
-const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-        console.error('Error al conectar con la base de datos:', err.message);
-    } else {
-        console.log('Conectado a la base de datos SQLite');
-    }
-});
-
-// Ruta principal - servir el archivo HTML
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+	res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// API para obtener estudiantes con paginación
-app.get('/api/students', (req, res) => {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 24; // 24 por página por defecto
-    const offset = (page - 1) * limit;
-    
-    // Query para contar el total de estudiantes
-    const countQuery = `SELECT COUNT(*) as total FROM estudiantes`;
-    
-    // Query para obtener estudiantes con paginación
-    const studentsQuery = `
-        SELECT 
-            e.id,
-            e.apellidos,
-            e.nombres,
-            e.dni,
-            e.fecha_nacimiento,
-            e.sexo,
-            e.discapacidad,
-            a.grado,
-            a.seccion,
-            a.anio,
-            ap.id as apoderado_id,
-            ap.apellidos as apoderado_apellidos,
-            ap.nombres as apoderado_nombres,
-            ap.dni as apoderado_dni,
-            ap.fecha_nacimiento as apoderado_fecha_nacimiento,
-            ap.celular as apoderado_celular,
-            d.departamento,
-            d.provincia,
-            d.distrito,
-            d.domicilio,
-            n.nombre as nivel
-        FROM estudiantes e
-        LEFT JOIN aulas a ON e.aula_id = a.id
-        LEFT JOIN apoderados ap ON e.apoderado_id = ap.id
-        LEFT JOIN direcciones d ON e.direccion_id = d.id
-        LEFT JOIN niveles n ON a.nivel_id = n.id
-        ORDER BY a.grado, a.seccion, e.apellidos, e.nombres
-        LIMIT ? OFFSET ?
-    `;
-    
-    // Primero obtener el total
-    db.get(countQuery, [], (err, countResult) => {
-        if (err) {
-            console.error('Error al contar estudiantes:', err.message);
-            res.status(500).json({ error: 'Error interno del servidor' });
-            return;
-        }
-        
-        const total = countResult.total;
-        const totalPages = Math.ceil(total / limit);
-        
-        // Luego obtener los estudiantes de la página actual
-        db.all(studentsQuery, [limit, offset], (err, rows) => {
-            if (err) {
-                console.error('Error al obtener estudiantes:', err.message);
-                res.status(500).json({ error: 'Error interno del servidor' });
-                return;
-            }
-            
-            // Transformar los datos
-            const students = rows.map(row => ({
-                id: row.id,
-                apellidos: row.apellidos,
-                nombres: row.nombres,
-                dni: row.dni,
-                fecha_nacimiento: row.fecha_nacimiento,
-                sexo: row.sexo,
-                discapacidad: row.discapacidad,
-                grado: row.grado,
-                seccion: row.seccion,
-                anio: row.anio,
-                nivel: row.nivel,
-                apoderado: row.apoderado_id ? {
-                    id: row.apoderado_id,
-                    apellidos: row.apoderado_apellidos,
-                    nombres: row.apoderado_nombres,
-                    dni: row.apoderado_dni,
-                    fecha_nacimiento: row.apoderado_fecha_nacimiento,
-                    celular: row.apoderado_celular
-                } : null,
-                direccion: row.departamento ? {
-                    departamento: row.departamento,
-                    provincia: row.provincia,
-                    distrito: row.distrito,
-                    domicilio: row.domicilio
-                } : null
-            }));
-            
-            res.json({
-                students,
-                pagination: {
-                    page,
-                    limit,
-                    total,
-                    totalPages,
-                    hasNext: page < totalPages,
-                    hasPrev: page > 1
-                }
-            });
-        });
-    });
+app.get('/api/students', async (req, res) => {
+	try {
+		const page = parseInt(req.query.page) || 1;
+		const limit = parseInt(req.query.limit) || 24;
+		const offset = (page - 1) * limit;
+
+		const {count, error: countError} = await supabase
+			.from('estudiantes')
+			.select('*', {count: 'exact', head: true});
+
+		if (countError) throw countError;
+
+		const total = count;
+		const totalPages = Math.ceil(total / limit);
+
+		const {data, error} = await supabase
+			.from('estudiantes')
+			.select(
+				`id, apellidos, nombres, dni, fecha_nacimiento, sexo, discapacidad, aula_id, apoderado_id, direccion_id, aulas(id, grado, seccion, anio, nivel_id), apoderados(id, apellidos, nombres, dni, fecha_nacimiento, celular), direcciones(departamento, provincia, distrito, domicilio)`
+			)
+			.order('aulas(grado)', {ascending: true})
+			.order('aulas(seccion)', {ascending: true})
+			.order('apellidos', {ascending: true})
+			.range(offset, offset + limit - 1);
+
+		if (error) throw error;
+
+		const aulaIds = data.map((e) => e.aula_id).filter(Boolean);
+		let niveles = {};
+
+		if (aulaIds.length > 0) {
+			const {data: aulaData} = await supabase
+				.from('aulas')
+				.select('id, niveles(nombre)')
+				.in('id', aulaIds);
+			if (aulaData)
+				aulaData.forEach((a) => {
+					niveles[a.id] = a.niveles?.nombre;
+				});
+		}
+
+		const students = data.map((row) => ({
+			id: row.id,
+			apellidos: row.apellidos,
+			nombres: row.nombres,
+			dni: row.dni,
+			fecha_nacimiento: row.fecha_nacimiento,
+			sexo: row.sexo,
+			discapacidad: row.discapacidad,
+			grado: row.aulas?.grado,
+			seccion: row.aulas?.seccion,
+			anio: row.aulas?.anio,
+			nivel: niveles[row.aula_id],
+			apoderado: row.apoderados
+				? {
+						id: row.apoderados.id,
+						apellidos: row.apoderados.apellidos,
+						nombres: row.apoderados.nombres,
+						dni: row.apoderados.dni,
+						fecha_nacimiento: row.apoderados.fecha_nacimiento,
+						celular: row.apoderados.celular,
+				  }
+				: null,
+			direccion: row.direcciones
+				? {
+						departamento: row.direcciones.departamento,
+						provincia: row.direcciones.provincia,
+						distrito: row.direcciones.distrito,
+						domicilio: row.direcciones.domicilio,
+				  }
+				: null,
+		}));
+
+		res.json({
+			students,
+			pagination: {
+				page,
+				limit,
+				total,
+				totalPages,
+				hasNext: page < totalPages,
+				hasPrev: page > 1,
+			},
+		});
+	} catch (error) {
+		console.error('Error:', error.message);
+		res.status(500).json({error: 'Error interno del servidor'});
+	}
 });
 
-// API para obtener un estudiante específico por ID
-app.get('/api/students/:id', (req, res) => {
-    const studentId = req.params.id;
-    
-    const query = `
-        SELECT 
-            e.id,
-            e.apellidos,
-            e.nombres,
-            e.dni,
-            e.fecha_nacimiento,
-            e.sexo,
-            e.discapacidad,
-            a.grado,
-            a.seccion,
-            a.anio,
-            ap.id as apoderado_id,
-            ap.apellidos as apoderado_apellidos,
-            ap.nombres as apoderado_nombres,
-            ap.dni as apoderado_dni,
-            ap.fecha_nacimiento as apoderado_fecha_nacimiento,
-            ap.celular as apoderado_celular,
-            d.departamento,
-            d.provincia,
-            d.distrito,
-            d.domicilio,
-            n.nombre as nivel
-        FROM estudiantes e
-        LEFT JOIN aulas a ON e.aula_id = a.id
-        LEFT JOIN apoderados ap ON e.apoderado_id = ap.id
-        LEFT JOIN direcciones d ON e.direccion_id = d.id
-        LEFT JOIN niveles n ON a.nivel_id = n.id
-        WHERE e.id = ?
-    `;
-    
-    db.get(query, [studentId], (err, row) => {
-        if (err) {
-            console.error('Error al obtener estudiante:', err.message);
-            res.status(500).json({ error: 'Error interno del servidor' });
-            return;
-        }
-        
-        if (!row) {
-            res.status(404).json({ error: 'Estudiante no encontrado' });
-            return;
-        }
-        
-        const student = {
-            id: row.id,
-            apellidos: row.apellidos,
-            nombres: row.nombres,
-            dni: row.dni,
-            fecha_nacimiento: row.fecha_nacimiento,
-            sexo: row.sexo,
-            discapacidad: row.discapacidad,
-            grado: row.grado,
-            seccion: row.seccion,
-            anio: row.anio,
-            nivel: row.nivel,
-            apoderado: row.apoderado_id ? {
-                id: row.apoderado_id,
-                apellidos: row.apoderado_apellidos,
-                nombres: row.apoderado_nombres,
-                dni: row.apoderado_dni,
-                fecha_nacimiento: row.apoderado_fecha_nacimiento,
-                celular: row.apoderado_celular
-            } : null,
-            direccion: row.departamento ? {
-                departamento: row.departamento,
-                provincia: row.provincia,
-                distrito: row.distrito,
-                domicilio: row.domicilio
-            } : null
-        };
-        
-        res.json(student);
-    });
+app.get('/api/students/:id', async (req, res) => {
+	try {
+		const {data, error} = await supabase
+			.from('estudiantes')
+			.select(
+				`id, apellidos, nombres, dni, fecha_nacimiento, sexo, discapacidad, aula_id, apoderado_id, direccion_id, aulas(id, grado, seccion, anio), apoderados(id, apellidos, nombres, dni, fecha_nacimiento, celular), direcciones(departamento, provincia, distrito, domicilio)`
+			)
+			.eq('id', req.params.id)
+			.single();
+		if (error && error.code === 'PGRST116') {
+			res.status(404).json({error: 'Estudiante no encontrado'});
+			return;
+		}
+		if (error) throw error;
+		let nivel = null;
+		if (data.aula_id) {
+			const {data: aulaData} = await supabase
+				.from('aulas')
+				.select('niveles(nombre)')
+				.eq('id', data.aula_id)
+				.single();
+			if (aulaData) nivel = aulaData.niveles?.nombre;
+		}
+		res.json({
+			id: data.id,
+			apellidos: data.apellidos,
+			nombres: data.nombres,
+			dni: data.dni,
+			fecha_nacimiento: data.fecha_nacimiento,
+			sexo: data.sexo,
+			discapacidad: data.discapacidad,
+			grado: data.aulas?.grado,
+			seccion: data.aulas?.seccion,
+			anio: data.aulas?.anio,
+			nivel,
+			apoderado: data.apoderados
+				? {
+						id: data.apoderados.id,
+						apellidos: data.apoderados.apellidos,
+						nombres: data.apoderados.nombres,
+						dni: data.apoderados.dni,
+						fecha_nacimiento: data.apoderados.fecha_nacimiento,
+						celular: data.apoderados.celular,
+				  }
+				: null,
+			direccion: data.direcciones
+				? {
+						departamento: data.direcciones.departamento,
+						provincia: data.direcciones.provincia,
+						distrito: data.direcciones.distrito,
+						domicilio: data.direcciones.domicilio,
+				  }
+				: null,
+		});
+	} catch (error) {
+		console.error('Error:', error.message);
+		res.status(500).json({error: 'Error interno del servidor'});
+	}
 });
 
-// API para búsqueda de estudiantes con paginación
-app.get('/api/search', (req, res) => {
-    const { q, type, grado, seccion, sexo } = req.query;
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 24;
-    const offset = (page - 1) * limit;
-    
-    let baseQuery = `
-        FROM estudiantes e
-        LEFT JOIN aulas a ON e.aula_id = a.id
-        LEFT JOIN apoderados ap ON e.apoderado_id = ap.id
-        LEFT JOIN direcciones d ON e.direccion_id = d.id
-        LEFT JOIN niveles n ON a.nivel_id = n.id
-        WHERE 1=1
-    `;
-    
-    const params = [];
-    
-    // Aplicar filtros de búsqueda
-    if (q) {
-        switch (type) {
-            case 'estudiante':
-                baseQuery += ` AND (e.nombres LIKE ? OR e.apellidos LIKE ? OR e.dni LIKE ?)`;
-                params.push(`%${q}%`, `%${q}%`, `%${q}%`);
-                break;
-            case 'apoderado':
-                baseQuery += ` AND (ap.nombres LIKE ? OR ap.apellidos LIKE ? OR ap.dni LIKE ?)`;
-                params.push(`%${q}%`, `%${q}%`, `%${q}%`);
-                break;
-            case 'dni':
-                baseQuery += ` AND (e.dni LIKE ? OR ap.dni LIKE ?)`;
-                params.push(`%${q}%`, `%${q}%`);
-                break;
-            default: // general
-                baseQuery += ` AND (
-                    e.nombres LIKE ? OR e.apellidos LIKE ? OR e.dni LIKE ? OR
-                    ap.nombres LIKE ? OR ap.apellidos LIKE ? OR ap.dni LIKE ? OR
-                    d.distrito LIKE ? OR d.provincia LIKE ? OR d.domicilio LIKE ?
-                )`;
-                params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
-        }
-    }
-    
-    // Aplicar filtros adicionales
-    if (grado) {
-        baseQuery += ` AND a.grado = ?`;
-        params.push(grado);
-    }
-    
-    if (seccion) {
-        baseQuery += ` AND a.seccion = ?`;
-        params.push(seccion);
-    }
-    
-    if (sexo) {
-        baseQuery += ` AND e.sexo = ?`;
-        params.push(sexo);
-    }
-    
-    // Query para contar resultados
-    const countQuery = `SELECT COUNT(*) as total ${baseQuery}`;
-    
-    // Query para obtener resultados con paginación
-    const studentsQuery = `
-        SELECT 
-            e.id,
-            e.apellidos,
-            e.nombres,
-            e.dni,
-            e.fecha_nacimiento,
-            e.sexo,
-            e.discapacidad,
-            a.grado,
-            a.seccion,
-            a.anio,
-            ap.id as apoderado_id,
-            ap.apellidos as apoderado_apellidos,
-            ap.nombres as apoderado_nombres,
-            ap.dni as apoderado_dni,
-            ap.fecha_nacimiento as apoderado_fecha_nacimiento,
-            ap.celular as apoderado_celular,
-            d.departamento,
-            d.provincia,
-            d.distrito,
-            d.domicilio,
-            n.nombre as nivel
-        ${baseQuery}
-        ORDER BY a.grado, a.seccion, e.apellidos, e.nombres
-        LIMIT ? OFFSET ?
-    `;
-    
-    // Primero obtener el total
-    db.get(countQuery, params, (err, countResult) => {
-        if (err) {
-            console.error('Error en conteo de búsqueda:', err.message);
-            res.status(500).json({ error: 'Error interno del servidor' });
-            return;
-        }
-        
-        const total = countResult.total;
-        const totalPages = Math.ceil(total / limit);
-        
-        // Luego obtener los resultados de la página actual
-        const searchParams = [...params, limit, offset];
-        db.all(studentsQuery, searchParams, (err, rows) => {
-            if (err) {
-                console.error('Error en búsqueda:', err.message);
-                res.status(500).json({ error: 'Error interno del servidor' });
-                return;
-            }
-            
-            const students = rows.map(row => ({
-                id: row.id,
-                apellidos: row.apellidos,
-                nombres: row.nombres,
-                dni: row.dni,
-                fecha_nacimiento: row.fecha_nacimiento,
-                sexo: row.sexo,
-                discapacidad: row.discapacidad,
-                grado: row.grado,
-                seccion: row.seccion,
-                anio: row.anio,
-                nivel: row.nivel,
-                apoderado: row.apoderado_id ? {
-                    id: row.apoderado_id,
-                    apellidos: row.apoderado_apellidos,
-                    nombres: row.apoderado_nombres,
-                    dni: row.apoderado_dni,
-                    fecha_nacimiento: row.apoderado_fecha_nacimiento,
-                    celular: row.apoderado_celular
-                } : null,
-                direccion: row.departamento ? {
-                    departamento: row.departamento,
-                    provincia: row.provincia,
-                    distrito: row.distrito,
-                    domicilio: row.domicilio
-                } : null
-            }));
-            
-            res.json({
-                students,
-                pagination: {
-                    page,
-                    limit,
-                    total,
-                    totalPages,
-                    hasNext: page < totalPages,
-                    hasPrev: page > 1
-                }
-            });
-        });
-    });
+app.get('/api/search', async (req, res) => {
+	try {
+		const {q, type, grado, seccion, sexo} = req.query;
+		const page = parseInt(req.query.page) || 1;
+		const limit = parseInt(req.query.limit) || 24;
+		const offset = (page - 1) * limit;
+
+		// Paso 1: Filtrar aulas si se especifican grado/sección
+		let aulaIds = null;
+		if (grado || seccion) {
+			let aulaQuery = supabase.from('aulas').select('id');
+			if (grado) aulaQuery = aulaQuery.eq('grado', grado);
+			if (seccion) aulaQuery = aulaQuery.eq('seccion', seccion);
+			const {data: aulasData, error: aulasError} = await aulaQuery;
+			if (aulasError) throw aulasError;
+			aulaIds = aulasData.map((a) => a.id);
+			if (aulaIds.length === 0) {
+				// No hay aulas que coincidan
+				return res.json({
+					students: [],
+					pagination: {
+						page,
+						limit,
+						total: 0,
+						totalPages: 0,
+						hasNext: false,
+						hasPrev: false,
+					},
+				});
+			}
+		}
+
+		// Paso 2: Filtrar estudiantes
+		let query = supabase
+			.from('estudiantes')
+			.select(
+				`id, apellidos, nombres, dni, fecha_nacimiento, sexo, discapacidad, aula_id, apoderado_id, direccion_id, aulas(id, grado, seccion, anio, nivel_id), apoderados(id, apellidos, nombres, dni, fecha_nacimiento, celular), direcciones(departamento, provincia, distrito, domicilio)`,
+				{count: 'exact'}
+			);
+
+		// Buscar en texto
+		if (q) {
+			query = query.or(
+				`nombres.ilike.%${q}%,apellidos.ilike.%${q}%,dni.ilike.%${q}%`
+			);
+		}
+
+		// Filtrar por aula_id si tenemos aulas
+		if (aulaIds) {
+			query = query.in('aula_id', aulaIds);
+		}
+
+		// Filtrar por sexo
+		if (sexo) {
+			query = query.eq('sexo', sexo);
+		}
+
+		// Ordenar por grado, sección y apellidos
+		const {data, count, error} = await query
+			.order('aulas(grado)', {ascending: true})
+			.order('aulas(seccion)', {ascending: true})
+			.order('apellidos', {ascending: true})
+			.range(offset, offset + limit - 1);
+
+		if (error) throw error;
+
+		const total = count || 0;
+		const totalPages = Math.ceil(total / limit);
+
+		// Obtener niveles
+		const aulasIdsData = data.map((e) => e.aula_id).filter(Boolean);
+		let niveles = {};
+
+		if (aulasIdsData.length > 0) {
+			const {data: aulaData} = await supabase
+				.from('aulas')
+				.select('id, niveles(nombre)')
+				.in('id', aulasIdsData);
+			if (aulaData)
+				aulaData.forEach((a) => {
+					niveles[a.id] = a.niveles?.nombre;
+				});
+		}
+
+		// Mapear datos
+		const students = data.map((row) => ({
+			id: row.id,
+			apellidos: row.apellidos,
+			nombres: row.nombres,
+			dni: row.dni,
+			fecha_nacimiento: row.fecha_nacimiento,
+			sexo: row.sexo,
+			discapacidad: row.discapacidad,
+			grado: row.aulas?.grado,
+			seccion: row.aulas?.seccion,
+			anio: row.aulas?.anio,
+			nivel: niveles[row.aula_id],
+			apoderado: row.apoderados
+				? {
+						id: row.apoderados.id,
+						apellidos: row.apoderados.apellidos,
+						nombres: row.apoderados.nombres,
+						dni: row.apoderados.dni,
+						fecha_nacimiento: row.apoderados.fecha_nacimiento,
+						celular: row.apoderados.celular,
+				  }
+				: null,
+			direccion: row.direcciones
+				? {
+						departamento: row.direcciones.departamento,
+						provincia: row.direcciones.provincia,
+						distrito: row.direcciones.distrito,
+						domicilio: row.direcciones.domicilio,
+				  }
+				: null,
+		}));
+
+		res.json({
+			students,
+			pagination: {
+				page,
+				limit,
+				total,
+				totalPages,
+				hasNext: page < totalPages,
+				hasPrev: page > 1,
+			},
+		});
+	} catch (error) {
+		console.error('Error:', error.message);
+		res.status(500).json({error: 'Error interno del servidor'});
+	}
 });
 
-// API para crear un nuevo estudiante
-app.post('/api/students', (req, res) => {
-    const { nombres, apellidos, dni, fecha_nacimiento, sexo, discapacidad, grado, seccion, apoderado, direccion } = req.body;
-    
-    // Validar campos requeridos
-    if (!nombres || !apellidos || !dni || !sexo) {
-        res.status(400).json({ error: 'Los campos nombres, apellidos, DNI y sexo son obligatorios' });
-        return;
-    }
-    
-    // Si se proporcionaron grado y sección, obtener el aula_id
-    if (grado && seccion) {
-        const aulaQuery = `SELECT id FROM aulas WHERE grado = ? AND seccion = ? LIMIT 1`;
-        
-        db.get(aulaQuery, [grado, seccion], (err, aulaRow) => {
-            if (err) {
-                console.error('Error al obtener aula:', err.message);
-                res.status(500).json({ error: 'Error interno del servidor' });
-                return;
-            }
-            
-            if (!aulaRow) {
-                res.status(400).json({ error: 'Combinación de grado y sección no válida' });
-                return;
-            }
-            
-            createStudentWithData(aulaRow.id);
-        });
-    } else {
-        createStudentWithData(null);
-    }
-    
-    function createStudentWithData(aulaId) {
-        // Primero crear dirección si se proporciona
-        if (direccion && (direccion.departamento || direccion.provincia || direccion.distrito || direccion.domicilio)) {
-            const direccionQuery = `
-                INSERT INTO direcciones (departamento, provincia, distrito, domicilio)
-                VALUES (?, ?, ?, ?)
-            `;
-            
-            db.run(direccionQuery, [
-                direccion.departamento || null,
-                direccion.provincia || null,
-                direccion.distrito || null,
-                direccion.domicilio || null
-            ], function(err) {
-                if (err) {
-                    console.error('Error al crear dirección:', err.message);
-                    res.status(500).json({ error: 'Error interno del servidor' });
-                    return;
-                }
-                
-                const direccionId = this.lastID;
-                createApoderadoAndStudent(direccionId, aulaId);
-            });
-        } else {
-            createApoderadoAndStudent(null, aulaId);
-        }
-        
-        function createApoderadoAndStudent(direccionId, aulaId) {
-            // Crear apoderado si se proporciona
-            if (apoderado && (apoderado.nombres || apoderado.apellidos)) {
-                const apoderadoQuery = `
-                    INSERT INTO apoderados (nombres, apellidos, dni, fecha_nacimiento, celular)
-                    VALUES (?, ?, ?, ?, ?)
-                `;
-                
-                db.run(apoderadoQuery, [
-                    apoderado.nombres || null,
-                    apoderado.apellidos || null,
-                    apoderado.dni || null,
-                    apoderado.fecha_nacimiento || null,
-                    apoderado.celular || null
-                ], function(err) {
-                    if (err) {
-                        console.error('Error al crear apoderado:', err.message);
-                        res.status(500).json({ error: 'Error interno del servidor' });
-                        return;
-                    }
-                    
-                    const apoderadoId = this.lastID;
-                    createStudent(direccionId, apoderadoId, aulaId);
-                });
-            } else {
-                createStudent(direccionId, null, aulaId);
-            }
-        }
-        
-        function createStudent(direccionId, apoderadoId, aulaId) {
-            // Crear estudiante
-            const studentQuery = `
-                INSERT INTO estudiantes (nombres, apellidos, dni, fecha_nacimiento, sexo, discapacidad, aula_id, apoderado_id, direccion_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `;
-            
-            db.run(studentQuery, [
-                nombres,
-                apellidos,
-                dni,
-                fecha_nacimiento || null,
-                sexo,
-                discapacidad || null,
-                aulaId,
-                apoderadoId,
-                direccionId
-            ], function(err) {
-                if (err) {
-                    console.error('Error al crear estudiante:', err.message);
-                    if (err.message.includes('UNIQUE constraint failed')) {
-                        res.status(400).json({ error: 'Ya existe un estudiante con este DNI' });
-                    } else {
-                        res.status(500).json({ error: 'Error interno del servidor' });
-                    }
-                    return;
-                }
-                
-                res.status(201).json({ 
-                    message: 'Estudiante creado exitosamente',
-                    studentId: this.lastID 
-                });
-            });
-        }
-    }
+app.post('/api/students', async (req, res) => {
+	try {
+		const {
+			nombres,
+			apellidos,
+			dni,
+			fecha_nacimiento,
+			sexo,
+			discapacidad,
+			grado,
+			seccion,
+			apoderado,
+			direccion,
+		} = req.body;
+		if (!nombres || !apellidos || !dni || !sexo) {
+			res.status(400).json({error: 'Campos obligatorios'});
+			return;
+		}
+		let aulaId = null;
+		if (grado && seccion) {
+			const {data} = await supabase
+				.from('aulas')
+				.select('id')
+				.eq('grado', grado)
+				.eq('seccion', seccion)
+				.single();
+			if (!data) {
+				res.status(400).json({error: 'Aula no válida'});
+				return;
+			}
+			aulaId = data.id;
+		}
+		let direccionId = null;
+		if (
+			direccion &&
+			(direccion.departamento ||
+				direccion.provincia ||
+				direccion.distrito ||
+				direccion.domicilio)
+		) {
+			const {data: dir} = await supabase
+				.from('direcciones')
+				.insert([
+					{
+						departamento: direccion.departamento || null,
+						provincia: direccion.provincia || null,
+						distrito: direccion.distrito || null,
+						domicilio: direccion.domicilio || null,
+					},
+				])
+				.select();
+			if (dir) direccionId = dir[0].id;
+		}
+		let apoderadoId = null;
+		if (apoderado && (apoderado.nombres || apoderado.apellidos)) {
+			const {data: apo} = await supabase
+				.from('apoderados')
+				.insert([
+					{
+						nombres: apoderado.nombres || null,
+						apellidos: apoderado.apellidos || null,
+						dni: apoderado.dni || null,
+						fecha_nacimiento: apoderado.fecha_nacimiento || null,
+						celular: apoderado.celular || null,
+					},
+				])
+				.select();
+			if (apo) apoderadoId = apo[0].id;
+		}
+		const {data: studentData, error: studentError} = await supabase
+			.from('estudiantes')
+			.insert([
+				{
+					nombres,
+					apellidos,
+					dni,
+					fecha_nacimiento: fecha_nacimiento || null,
+					sexo,
+					discapacidad: discapacidad || null,
+					aula_id: aulaId,
+					apoderado_id: apoderadoId,
+					direccion_id: direccionId,
+				},
+			])
+			.select();
+		if (studentError) {
+			if (studentError.message.includes('unique')) {
+				res.status(400).json({error: 'DNI duplicado'});
+			} else throw studentError;
+			return;
+		}
+		res.status(201).json({message: 'Creado', studentId: studentData[0].id});
+	} catch (error) {
+		console.error('Error:', error.message);
+		res.status(500).json({error: 'Error interno'});
+	}
 });
 
-// API para actualizar un estudiante
-// API para actualizar un estudiante
-app.put('/api/students/:id', (req, res) => {
-    const studentId = req.params.id;
-    const { nombres, apellidos, dni, fecha_nacimiento, sexo, discapacidad, grado, seccion } = req.body;
-    
-    // Si se proporcionaron grado y sección, primero obtener el aula_id
-    if (grado && seccion) {
-        const aulaQuery = `SELECT id FROM aulas WHERE grado = ? AND seccion = ? LIMIT 1`;
-        
-        db.get(aulaQuery, [grado, seccion], (err, aulaRow) => {
-            if (err) {
-                console.error('Error al obtener aula:', err.message);
-                res.status(500).json({ error: 'Error interno del servidor' });
-                return;
-            }
-            
-            if (!aulaRow) {
-                res.status(400).json({ error: 'Combinación de grado y sección no válida' });
-                return;
-            }
-            
-            // Actualizar estudiante con el nuevo aula_id
-            const updateQuery = `
-                UPDATE estudiantes 
-                SET nombres = ?, apellidos = ?, dni = ?, fecha_nacimiento = ?, sexo = ?, discapacidad = ?, aula_id = ?
-                WHERE id = ?
-            `;
-            
-            db.run(updateQuery, [nombres, apellidos, dni, fecha_nacimiento, sexo, discapacidad, aulaRow.id, studentId], function(err) {
-                if (err) {
-                    console.error('Error al actualizar estudiante:', err.message);
-                    res.status(500).json({ error: 'Error interno del servidor' });
-                    return;
-                }
-                
-                if (this.changes === 0) {
-                    res.status(404).json({ error: 'Estudiante no encontrado' });
-                    return;
-                }
-                
-                res.json({ 
-                    message: 'Estudiante actualizado exitosamente',
-                    changes: this.changes 
-                });
-            });
-        });
-    } else {
-        // Actualizar sin cambiar el aula
-        const updateQuery = `
-            UPDATE estudiantes 
-            SET nombres = ?, apellidos = ?, dni = ?, fecha_nacimiento = ?, sexo = ?, discapacidad = ?
-            WHERE id = ?
-        `;
-        
-        db.run(updateQuery, [nombres, apellidos, dni, fecha_nacimiento, sexo, discapacidad, studentId], function(err) {
-            if (err) {
-                console.error('Error al actualizar estudiante:', err.message);
-                res.status(500).json({ error: 'Error interno del servidor' });
-                return;
-            }
-            
-            if (this.changes === 0) {
-                res.status(404).json({ error: 'Estudiante no encontrado' });
-                return;
-            }
-            
-            res.json({ 
-                message: 'Estudiante actualizado exitosamente',
-                changes: this.changes 
-            });
-        });
-    }
+app.put('/api/students/:id', async (req, res) => {
+	try {
+		const {
+			nombres,
+			apellidos,
+			dni,
+			fecha_nacimiento,
+			sexo,
+			discapacidad,
+			grado,
+			seccion,
+		} = req.body;
+		let aulaId = null;
+		if (grado && seccion) {
+			const {data} = await supabase
+				.from('aulas')
+				.select('id')
+				.eq('grado', grado)
+				.eq('seccion', seccion)
+				.single();
+			if (!data) {
+				res.status(400).json({error: 'Aula no válida'});
+				return;
+			}
+			aulaId = data.id;
+		}
+		const updateData = {
+			nombres,
+			apellidos,
+			dni,
+			fecha_nacimiento: fecha_nacimiento || null,
+			sexo,
+			discapacidad: discapacidad || null,
+		};
+		if (aulaId) updateData.aula_id = aulaId;
+		const {error} = await supabase
+			.from('estudiantes')
+			.update(updateData)
+			.eq('id', req.params.id);
+		if (error) throw error;
+		res.json({message: 'Actualizado'});
+	} catch (error) {
+		console.error('Error:', error.message);
+		res.status(500).json({error: 'Error interno'});
+	}
 });
 
-// API para actualizar un apoderado
-app.put('/api/apoderados/:id', (req, res) => {
-    const apoderadoId = req.params.id;
-    const { nombres, apellidos, dni, fecha_nacimiento, celular } = req.body;
-    
-    const query = `
-        UPDATE apoderados 
-        SET nombres = ?, apellidos = ?, dni = ?, fecha_nacimiento = ?, celular = ?
-        WHERE id = ?
-    `;
-    
-    db.run(query, [nombres, apellidos, dni, fecha_nacimiento, celular, apoderadoId], function(err) {
-        if (err) {
-            console.error('Error al actualizar apoderado:', err.message);
-            res.status(500).json({ error: 'Error interno del servidor' });
-            return;
-        }
-        
-        if (this.changes === 0) {
-            res.status(404).json({ error: 'Apoderado no encontrado' });
-            return;
-        }
-        
-        res.json({ 
-            message: 'Apoderado actualizado exitosamente',
-            changes: this.changes 
-        });
-    });
+app.put('/api/apoderados/:id', async (req, res) => {
+	try {
+		const {nombres, apellidos, dni, fecha_nacimiento, celular} = req.body;
+		const {error} = await supabase
+			.from('apoderados')
+			.update({
+				nombres,
+				apellidos,
+				dni,
+				fecha_nacimiento: fecha_nacimiento || null,
+				celular: celular || null,
+			})
+			.eq('id', req.params.id);
+		if (error) throw error;
+		res.json({message: 'Actualizado'});
+	} catch (error) {
+		console.error('Error:', error.message);
+		res.status(500).json({error: 'Error interno'});
+	}
 });
 
-// API para actualizar una dirección
-app.put('/api/direcciones/:id', (req, res) => {
-    const direccionId = req.params.id;
-    const { departamento, provincia, distrito, domicilio } = req.body;
-    
-    const query = `
-        UPDATE direcciones 
-        SET departamento = ?, provincia = ?, distrito = ?, domicilio = ?
-        WHERE id = ?
-    `;
-    
-    db.run(query, [departamento, provincia, distrito, domicilio, direccionId], function(err) {
-        if (err) {
-            console.error('Error al actualizar dirección:', err.message);
-            res.status(500).json({ error: 'Error interno del servidor' });
-            return;
-        }
-        
-        if (this.changes === 0) {
-            res.status(404).json({ error: 'Dirección no encontrada' });
-            return;
-        }
-        
-        res.json({ 
-            message: 'Dirección actualizada exitosamente',
-            changes: this.changes 
-        });
-    });
+app.put('/api/direcciones/:id', async (req, res) => {
+	try {
+		const {departamento, provincia, distrito, domicilio} = req.body;
+		const {error} = await supabase
+			.from('direcciones')
+			.update({
+				departamento: departamento || null,
+				provincia: provincia || null,
+				distrito: distrito || null,
+				domicilio: domicilio || null,
+			})
+			.eq('id', req.params.id);
+		if (error) throw error;
+		res.json({message: 'Actualizado'});
+	} catch (error) {
+		console.error('Error:', error.message);
+		res.status(500).json({error: 'Error interno'});
+	}
 });
 
-// API para eliminar un estudiante
-app.delete('/api/students/:id', (req, res) => {
-    const studentId = req.params.id;
-    
-    // Primero, obtener información del estudiante para eliminar registros relacionados
-    const getStudentQuery = `
-        SELECT apoderado_id, direccion_id 
-        FROM estudiantes 
-        WHERE id = ?
-    `;
-    
-    db.get(getStudentQuery, [studentId], (err, student) => {
-        if (err) {
-            console.error('Error al obtener estudiante para eliminar:', err.message);
-            res.status(500).json({ error: 'Error interno del servidor' });
-            return;
-        }
-        
-        if (!student) {
-            res.status(404).json({ error: 'Estudiante no encontrado' });
-            return;
-        }
-        
-        // Iniciar transacción para eliminar todos los registros relacionados
-        db.serialize(() => {
-            db.run('BEGIN TRANSACTION');
-            
-            // Eliminar estudiante
-            db.run('DELETE FROM estudiantes WHERE id = ?', [studentId], function(err) {
-                if (err) {
-                    console.error('Error al eliminar estudiante:', err.message);
-                    db.run('ROLLBACK');
-                    res.status(500).json({ error: 'Error interno del servidor' });
-                    return;
-                }
-                
-                let deletedRecords = this.changes;
-                let completedDeletions = 0;
-                let totalDeletions = 1; // Solo el estudiante es obligatorio
-                
-                // Eliminar apoderado si existe
-                if (student.apoderado_id) {
-                    totalDeletions++;
-                    db.run('DELETE FROM apoderados WHERE id = ?', [student.apoderado_id], function(err) {
-                        if (err) {
-                            console.error('Error al eliminar apoderado:', err.message);
-                        }
-                        completedDeletions++;
-                        if (completedDeletions === totalDeletions - 1) {
-                            finalizeDeletion();
-                        }
-                    });
-                }
-                
-                // Eliminar dirección si existe
-                if (student.direccion_id) {
-                    totalDeletions++;
-                    db.run('DELETE FROM direcciones WHERE id = ?', [student.direccion_id], function(err) {
-                        if (err) {
-                            console.error('Error al eliminar dirección:', err.message);
-                        }
-                        completedDeletions++;
-                        if (completedDeletions === totalDeletions - 1) {
-                            finalizeDeletion();
-                        }
-                    });
-                }
-                
-                // Si no hay registros relacionados para eliminar
-                if (totalDeletions === 1) {
-                    finalizeDeletion();
-                }
-                
-                function finalizeDeletion() {
-                    db.run('COMMIT', (err) => {
-                        if (err) {
-                            console.error('Error al confirmar transacción:', err.message);
-                            res.status(500).json({ error: 'Error interno del servidor' });
-                            return;
-                        }
-                        
-                        res.json({ 
-                            message: 'Estudiante eliminado exitosamente',
-                            deletedRecords: deletedRecords
-                        });
-                    });
-                }
-            });
-        });
-    });
+app.delete('/api/students/:id', async (req, res) => {
+	try {
+		const {data: student, error: getError} = await supabase
+			.from('estudiantes')
+			.select('apoderado_id, direccion_id')
+			.eq('id', req.params.id)
+			.single();
+		if (getError && getError.code === 'PGRST116') {
+			res.status(404).json({error: 'No encontrado'});
+			return;
+		}
+		if (getError) throw getError;
+		const {error: deleteError} = await supabase
+			.from('estudiantes')
+			.delete()
+			.eq('id', req.params.id);
+		if (deleteError) throw deleteError;
+		let deletedRecords = 1;
+		if (student.apoderado_id) {
+			const {error} = await supabase
+				.from('apoderados')
+				.delete()
+				.eq('id', student.apoderado_id);
+			if (!error) deletedRecords++;
+		}
+		if (student.direccion_id) {
+			const {error} = await supabase
+				.from('direcciones')
+				.delete()
+				.eq('id', student.direccion_id);
+			if (!error) deletedRecords++;
+		}
+		res.json({message: 'Eliminado', deletedRecords});
+	} catch (error) {
+		console.error('Error:', error.message);
+		res.status(500).json({error: 'Error interno'});
+	}
 });
 
-// API para obtener grados disponibles
-app.get('/api/grados', (req, res) => {
-    const query = `SELECT DISTINCT grado FROM aulas ORDER BY grado`;
-    
-    db.all(query, [], (err, rows) => {
-        if (err) {
-            console.error('Error al obtener grados:', err.message);
-            res.status(500).json({ error: 'Error interno del servidor' });
-            return;
-        }
-        
-        res.json(rows);
-    });
+app.get('/api/grados', async (req, res) => {
+	try {
+		const {data, error} = await supabase
+			.from('aulas')
+			.select('grado')
+			.order('grado', {ascending: true});
+		if (error) throw error;
+		const uniqueGrados = [...new Set(data.map((d) => d.grado))];
+		res.json(uniqueGrados.map((grado) => ({grado})));
+	} catch (error) {
+		console.error('Error:', error.message);
+		res.status(500).json({error: 'Error interno'});
+	}
 });
 
-// API para obtener secciones disponibles
-app.get('/api/secciones', (req, res) => {
-    const query = `SELECT DISTINCT seccion FROM aulas ORDER BY seccion`;
-    
-    db.all(query, [], (err, rows) => {
-        if (err) {
-            console.error('Error al obtener secciones:', err.message);
-            res.status(500).json({ error: 'Error interno del servidor' });
-            return;
-        }
-        
-        res.json(rows);
-    });
+app.get('/api/secciones', async (req, res) => {
+	try {
+		const {data, error} = await supabase
+			.from('aulas')
+			.select('seccion')
+			.order('seccion', {ascending: true});
+		if (error) throw error;
+		const uniqueSecciones = [...new Set(data.map((d) => d.seccion))];
+		res.json(uniqueSecciones.map((seccion) => ({seccion})));
+	} catch (error) {
+		console.error('Error:', error.message);
+		res.status(500).json({error: 'Error interno'});
+	}
 });
 
-// API para obtener el aula_id basado en grado y sección
-app.get('/api/aula', (req, res) => {
-    const { grado, seccion } = req.query;
-    
-    if (!grado || !seccion) {
-        res.status(400).json({ error: 'Grado y sección son requeridos' });
-        return;
-    }
-    
-    const query = `SELECT id FROM aulas WHERE grado = ? AND seccion = ? LIMIT 1`;
-    
-    db.get(query, [grado, seccion], (err, row) => {
-        if (err) {
-            console.error('Error al obtener aula:', err.message);
-            res.status(500).json({ error: 'Error interno del servidor' });
-            return;
-        }
-        
-        if (!row) {
-            res.status(404).json({ error: 'Aula no encontrada' });
-            return;
-        }
-        
-        res.json({ aula_id: row.id });
-    });
+app.get('/api/aula', async (req, res) => {
+	try {
+		const {grado, seccion} = req.query;
+		if (!grado || !seccion) {
+			res.status(400).json({error: 'Requeridos'});
+			return;
+		}
+		const {data, error} = await supabase
+			.from('aulas')
+			.select('id')
+			.eq('grado', grado)
+			.eq('seccion', seccion)
+			.single();
+		if (error && error.code === 'PGRST116') {
+			res.status(404).json({error: 'No encontrada'});
+			return;
+		}
+		if (error) throw error;
+		res.json({aula_id: data.id});
+	} catch (error) {
+		console.error('Error:', error.message);
+		res.status(500).json({error: 'Error interno'});
+	}
 });
 
-// API para obtener estadísticas
-app.get('/api/stats', (req, res) => {
-    const queries = {
-        totalStudents: `SELECT COUNT(*) as count FROM estudiantes`,
-        studentsByGrade: `
-            SELECT a.grado, COUNT(*) as count 
-            FROM estudiantes e 
-            JOIN aulas a ON e.aula_id = a.id 
-            GROUP BY a.grado 
-            ORDER BY a.grado
-        `,
-        studentsBySection: `
-            SELECT a.seccion, COUNT(*) as count 
-            FROM estudiantes e 
-            JOIN aulas a ON e.aula_id = a.id 
-            GROUP BY a.seccion 
-            ORDER BY a.seccion
-        `,
-        studentsBySex: `
-            SELECT sexo, COUNT(*) as count 
-            FROM estudiantes 
-            GROUP BY sexo
-        `
-    };
-    
-    const stats = {};
-    let completed = 0;
-    const totalQueries = Object.keys(queries).length;
-    
-    Object.entries(queries).forEach(([key, query]) => {
-        db.all(query, [], (err, rows) => {
-            if (err) {
-                console.error(`Error en query ${key}:`, err.message);
-                stats[key] = [];
-            } else {
-                stats[key] = rows;
-            }
-            
-            completed++;
-            if (completed === totalQueries) {
-                res.json(stats);
-            }
-        });
-    });
+app.get('/api/stats', async (req, res) => {
+	try {
+		const stats = {};
+		const {count: totalStudents} = await supabase
+			.from('estudiantes')
+			.select('*', {count: 'exact', head: true});
+		stats.totalStudents = [{count: totalStudents}];
+		const {data: byGrade} = await supabase
+			.from('estudiantes')
+			.select('aula_id, aulas(grado)');
+		const grouped = {};
+		byGrade.forEach((e) => {
+			const grado = e.aulas?.grado;
+			if (grado) grouped[grado] = (grouped[grado] || 0) + 1;
+		});
+		stats.studentsByGrade = Object.entries(grouped).map(([grado, count]) => ({
+			grado,
+			count,
+		}));
+		res.json(stats);
+	} catch (error) {
+		console.error('Error:', error.message);
+		res.status(500).json({error: 'Error interno'});
+	}
 });
 
-// Manejo de errores
 app.use((err, req, res, next) => {
-    console.error('Error no manejado:', err.stack);
-    res.status(500).json({ error: 'Error interno del servidor' });
+	console.error('Error:', err.stack);
+	res.status(500).json({error: 'Error interno'});
 });
 
-// Ruta 404
 app.use((req, res) => {
-    res.status(404).json({ error: 'Ruta no encontrada' });
+	res.status(404).json({error: 'No encontrado'});
 });
 
-// Iniciar servidor
 app.listen(PORT, () => {
-    console.log(`Servidor ejecutándose en http://localhost:${PORT}`);
+	console.log(`Servidor en http://localhost:${PORT}`);
+	console.log('Conectado a Supabase ✅');
 });
 
-// Manejo de cierre de la aplicación
 process.on('SIGINT', () => {
-    console.log('Cerrando servidor...');
-    db.close((err) => {
-        if (err) {
-            console.error('Error al cerrar la base de datos:', err.message);
-        } else {
-            console.log('Conexión a la base de datos cerrada.');
-        }
-        process.exit(0);
-    });
+	console.log('Cerrando...');
+	process.exit(0);
 });
