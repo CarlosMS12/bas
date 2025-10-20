@@ -44,3 +44,7 @@ build/
 .cache/
 .npm/
 .yarn/
+
+venv/
+__pycache__/
+.pytest_cache/

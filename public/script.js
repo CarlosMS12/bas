@@ -196,7 +196,7 @@ async function loadStudents(page = 1, limit = 24) {
 async function loadFilterOptions() {
     try {
         // Para obtener todas las opciones únicas, hacemos una consulta sin paginación
-        const response = await fetch(`${API_BASE_URL}/students?limit=1000`);
+        const response = await fetch(`${API_BASE_URL}/students?limit=2000`);
         if (!response.ok) throw new Error('Error al cargar opciones de filtros');
         
         const data = await response.json();
