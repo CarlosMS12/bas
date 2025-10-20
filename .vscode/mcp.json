@@ -1,8 +1,16 @@
 {
-    "servers": {
-        "sqlite-query": {
-            "command": "mcp-sqlite-tool",
-            "type": "stdio"
-        }
-    }
+	"inputs": [
+		{
+			"type": "promptString",
+			"id": "db_path",
+			"description": "SQLite Database Path",
+			"default": "${workspaceFolder}/estudiantes.db"
+		}
+	],
+	"servers": {
+		"sqlite": {
+			"command": "uvx",
+			"args": ["mcp-server-sqlite", "--db-path", "${input:db_path}"]
+		}
+	}
 }
