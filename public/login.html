@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="es">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Iniciar Sesión - Sistema de Estudiantes</title>
+		<link
+			href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+			rel="stylesheet"
+		/>
+		<link
+			href="https://fonts.googleapis.com/icon?family=Material+Icons"
+			rel="stylesheet"
+		/>
+		<style>
+			* {
+				margin: 0;
+				padding: 0;
+				box-sizing: border-box;
+			}
+
+			body {
+				font-family: 'Inter', sans-serif;
+				background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%);
+				min-height: 100vh;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				padding: 20px;
+				background-attachment: fixed;
+			}
+			.auth-container {
+				width: 100%;
+				max-width: 400px;
+			}
+
+			.auth-card {
+				background: white;
+				border-radius: 12px;
+				box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+				overflow: hidden;
+				animation: slideUp 0.4s ease-out;
+				transition: all 0.3s ease;
+				border: 1px solid rgba(255, 255, 255, 0.8);
+			}
+
+			.auth-card:hover {
+				box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+			}
+
+			@keyframes slideUp {
+				from {
+					opacity: 0;
+					transform: translateY(20px);
+				}
+				to {
+					opacity: 1;
+					transform: translateY(0);
+				}
+			}
+			.auth-header {
+				padding: 35px 20px;
+				text-align: center;
+				position: relative;
+			}
+
+			.auth-header::after {
+				content: '';
+				position: absolute;
+				bottom: 0;
+				left: 0;
+				right: 0;
+				height: 2px;
+			}
+
+			.school-logo {
+				width: 120px;
+				height: 120px;
+				margin: 0 auto 15px;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				overflow: hidden;
+			}
+
+			.school-logo img {
+				width: 100%;
+				height: 100%;
+				object-fit: cover;
+			}
+
+			.auth-header h1 {
+				font-size: 22px;
+				font-weight: 700;
+				color: #000000;
+				margin-bottom: 6px;
+				letter-spacing: -0.3px;
+			}
+
+			.auth-header p {
+				font-size: 13px;
+				color: rgba(0, 0, 0, 0.85);
+				margin: 0;
+				letter-spacing: 0.2px;
+			}
+
+			.auth-body {
+				padding: 30px;
+			}
+
+			.form-group {
+				margin-bottom: 18px;
+			}
+
+			.form-group label {
+				display: block;
+				font-size: 13px;
+				font-weight: 500;
+				color: #555;
+				margin-bottom: 6px;
+			}
+
+			.form-group input,
+			.form-group select {
+				width: 100%;
+				padding: 10px 12px;
+				font-size: 14px;
+				border: 1px solid #e0e0e0;
+				border-radius: 6px;
+				font-family: 'Inter', sans-serif;
+				transition: all 0.3s ease;
+				background: #fafbfc;
+			}
+
+			.form-group input:focus,
+			.form-group select:focus {
+				outline: none;
+				border-color: #1976d2;
+				background: white;
+				box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.15);
+			}
+
+			.form-tabs {
+				display: flex;
+				gap: 0;
+				margin-bottom: 20px;
+				border-bottom: 1px solid #e8e8e8;
+				margin: -30px -30px 20px -30px;
+			}
+
+			.form-tab {
+				flex: 1;
+				padding: 12px;
+				text-align: center;
+				cursor: pointer;
+				font-weight: 500;
+				font-size: 13px;
+				color: #999;
+				border-bottom: 2px solid transparent;
+				transition: all 0.3s ease;
+				position: relative;
+			}
+
+			.form-tab:hover {
+				color: #1976d2;
+			}
+
+			.form-tab.active {
+				color: #1976d2;
+				border-bottom-color: #1976d2;
+				animation: tabActivate 0.3s ease;
+			}
+
+			@keyframes tabActivate {
+				from {
+					transform: translateY(-2px);
+					opacity: 0.8;
+				}
+				to {
+					transform: translateY(0);
+					opacity: 1;
+				}
+			}
+
+			.tab-content {
+				display: none;
+			}
+
+			.tab-content.active {
+				display: block;
+			}
+
+			.btn-submit {
+				width: 100%;
+				padding: 10px;
+				background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+				color: white;
+				border: none;
+				border-radius: 6px;
+				font-size: 14px;
+				font-weight: 600;
+				cursor: pointer;
+				transition: all 0.3s ease;
+				font-family: 'Inter', sans-serif;
+				position: relative;
+				overflow: hidden;
+				box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3);
+			}
+
+			.btn-submit::before {
+				content: '';
+				position: absolute;
+				top: 0;
+				left: -100%;
+				width: 100%;
+				height: 100%;
+				background: linear-gradient(
+					90deg,
+					transparent,
+					rgba(255, 255, 255, 0.3),
+					transparent
+				);
+				transition: left 0.5s ease;
+			}
+
+			.btn-submit:hover {
+				transform: translateY(-2px);
+				box-shadow: 0 6px 16px rgba(25, 118, 210, 0.4);
+			}
+
+			.btn-submit:hover::before {
+				left: 100%;
+			}
+
+			.btn-submit:active {
+				transform: translateY(0);
+			}
+
+			.btn-submit:disabled {
+				opacity: 0.6;
+				cursor: not-allowed;
+			}
+
+			.message {
+				padding: 10px 12px;
+				border-radius: 6px;
+				margin-bottom: 15px;
+				font-size: 13px;
+				display: none;
+				animation: slideDown 0.3s ease;
+				border-left: 3px solid transparent;
+			}
+
+			@keyframes slideDown {
+				from {
+					opacity: 0;
+					transform: translateY(-10px);
+				}
+				to {
+					opacity: 1;
+					transform: translateY(0);
+				}
+			}
+
+			.message.show {
+				display: block;
+			}
+
+			.error-message {
+				background: #fef2f2;
+				border: 1px solid #fecaca;
+				border-left-color: #b00020;
+				color: #b00020;
+			}
+
+			.success-message {
+				background: #f0fdf4;
+				border: 1px solid #dcfce7;
+				border-left-color: #22c55e;
+				color: #16a34a;
+			}
+
+			.loading {
+				display: none;
+				text-align: center;
+				padding: 15px;
+				color: #667eea;
+			}
+
+			.spinner {
+				border: 2px solid #f3f3f3;
+				border-top: 2px solid #667eea;
+				border-radius: 50%;
+				width: 20px;
+				height: 20px;
+				animation: spin 1s linear infinite;
+				margin: 0 auto 8px;
+			}
+
+			@keyframes spin {
+				0% {
+					transform: rotate(0deg);
+				}
+				100% {
+					transform: rotate(360deg);
+				}
+			}
+
+			.info-box {
+				background: #f5f7fa;
+				border-left: 3px solid #667eea;
+				padding: 12px;
+				border-radius: 4px;
+				font-size: 12px;
+				color: #666;
+				margin-top: 15px;
+				line-height: 1.5;
+			}
+
+			.info-box strong {
+				display: block;
+				color: #333;
+				margin-bottom: 5px;
+			}
+
+			/* Ocultar opción de registrarse - cambiar display a 'flex' para habilitar */
+			.form-tab[data-tab='register'],
+			#register {
+				display: none !important;
+			}
+
+			@media (max-width: 480px) {
+				.auth-body {
+					padding: 20px;
+				}
+
+				.auth-header {
+					padding: 20px;
+				}
+
+				.auth-header h1 {
+					font-size: 18px;
+				}
+
+				.school-logo {
+					width: 40px;
+					height: 40px;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<div class="auth-container">
+			<div class="auth-card">
+				<div class="auth-header">
+					<div class="school-logo">
+						<img
+							src="assets/logo.jpg"
+							alt="Logo Escuela"
+							onerror="this.style.display='none'"
+						/>
+					</div>
+					<h1>Sistema de Estudiantes</h1>
+					<p>Acceso seguro</p>
+				</div>
+
+				<div class="auth-body">
+					<div class="error-message message" id="errorMessage"></div>
+					<div class="success-message message" id="successMessage"></div>
+
+					<div class="form-tabs">
+						<div class="form-tab active" data-tab="login">Iniciar Sesión</div>
+						<div class="form-tab" data-tab="register">Registrarse</div>
+					</div>
+
+					<!-- Login Tab -->
+					<div id="login" class="tab-content active">
+						<form id="loginForm">
+							<div class="form-group">
+								<label>Email</label>
+								<input type="email" id="loginEmail" placeholder="tu@email.com" required />
+							</div>
+
+							<div class="form-group">
+								<label>Contraseña</label>
+								<input type="password" id="loginPassword" placeholder="••••••••" required />
+							</div>
+
+							<button type="submit" class="btn-submit">Iniciar Sesión</button>
+						</form>
+					</div>
+
+					<!-- Register Tab -->
+					<div id="register" class="tab-content">
+						<form id="registerForm">
+							<div class="form-group">
+								<label>Email</label>
+								<input type="email" id="registerEmail" placeholder="tu@email.com" required />
+							</div>
+
+							<div class="form-group">
+								<label>Nombre Completo</label>
+								<input type="text" id="registerName" placeholder="Tu nombre" required />
+							</div>
+
+							<div class="form-group">
+								<label>Rol</label>
+								<select id="registerRole" required>
+									<option value="">Selecciona un rol</option>
+									<option value="profesor">Profesor</option>
+									<option value="apoderado">Admin</option>
+								</select>
+							</div>
+
+							<div class="form-group">
+								<label>Contraseña (mín. 8 caracteres)</label>
+								<input type="password" id="registerPassword" placeholder="••••••••" required />
+							</div>
+
+							<div class="form-group">
+								<label>Confirmar Contraseña</label>
+								<input type="password" id="registerConfirm" placeholder="••••••••" required />
+							</div>
+
+							<button type="submit" class="btn-submit">Crear Cuenta</button>
+						</form>
+					</div>
+
+					<div class="loading" id="loading">
+						<div class="spinner"></div>
+						<span>Procesando...</span>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<script src="auth.js"></script>
+		<script>
+			/*
+			 * IMPORTANTE: La opción de Registrarse está OCULTA por defecto.
+			 * Para HABILITAR el registro, comenta la siguiente línea en el CSS (línea ~295):
+			 *
+			 * .form-tab[data-tab="register"],
+			 * #register {
+			 *     display: none !important;
+			 * }
+			 *
+			 * Cambia "display: none !important;" por "display: flex !important;" para la pestaña
+			 * y "display: block !important;" para el contenido del formulario.
+			 */
+
+			// Tab switching
+			document.querySelectorAll('.form-tab').forEach((tab) => {
+				tab.addEventListener('click', () => {
+					const tabName = tab.dataset.tab;
+					document
+						.querySelectorAll('.form-tab')
+						.forEach((t) => t.classList.remove('active'));
+					document
+						.querySelectorAll('.tab-content')
+						.forEach((c) => c.classList.remove('active'));
+					tab.classList.add('active');
+					document.getElementById(tabName).classList.add('active');
+					document.getElementById('errorMessage').classList.remove('show');
+					document.getElementById('successMessage').classList.remove('show');
+				});
+			});
+
+			// Login
+			document.getElementById('loginForm').addEventListener('submit', async (e) => {
+				e.preventDefault();
+				const email = document.getElementById('loginEmail').value;
+				const password = document.getElementById('loginPassword').value;
+
+				try {
+					showLoading(true);
+					const result = await AuthManager.login(email, password);
+					if (result.success) {
+						showSuccess('¡Bienvenido! Redirigiendo...');
+						setTimeout(() => (window.location.href = '/app'), 1500);
+					} else {
+						showError(result.error || 'Error al iniciar sesión');
+					}
+				} catch (error) {
+					showError(error.message);
+				} finally {
+					showLoading(false);
+				}
+			});
+
+			// Register
+			document
+				.getElementById('registerForm')
+				.addEventListener('submit', async (e) => {
+					e.preventDefault();
+					const email = document.getElementById('registerEmail').value;
+					const name = document.getElementById('registerName').value;
+					const role = document.getElementById('registerRole').value;
+					const password = document.getElementById('registerPassword').value;
+					const confirm = document.getElementById('registerConfirm').value;
+
+					if (password !== confirm) {
+						showError('Las contraseñas no coinciden');
+						return;
+					}
+					if (password.length < 8) {
+						showError('Mínimo 8 caracteres');
+						return;
+					}
+
+					try {
+						showLoading(true);
+						const result = await AuthManager.register(email, password, name, role);
+						if (result.success) {
+							showSuccess('¡Cuenta creada! Iniciando sesión...');
+							setTimeout(() => (window.location.href = '/app'), 1500);
+						} else {
+							showError(result.error || 'Error al registrarse');
+						}
+					} catch (error) {
+						showError(error.message);
+					} finally {
+						showLoading(false);
+					}
+				});
+
+			function showError(msg) {
+				document.getElementById('errorMessage').textContent = msg;
+				document.getElementById('errorMessage').classList.add('show');
+				document.getElementById('successMessage').classList.remove('show');
+			}
+
+			function showSuccess(msg) {
+				document.getElementById('successMessage').textContent = msg;
+				document.getElementById('successMessage').classList.add('show');
+				document.getElementById('errorMessage').classList.remove('show');
+			}
+
+			function showLoading(show) {
+				document.getElementById('loading').style.display = show ? 'block' : 'none';
+				document.querySelectorAll('button').forEach((btn) => (btn.disabled = show));
+			}
+		</script>
+	</body>
+</html>

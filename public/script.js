@@ -4,6 +4,16 @@
 
 const API_BASE_URL = '/api';
 
+// Función helper para obtener headers con autenticación
+function getAuthHeaders() {
+    const authHeader = SessionManager.getAuthHeader();
+    const headers = {'Content-Type': 'application/json'};
+    if (authHeader) {
+        Object.assign(headers, authHeader);
+    }
+    return headers;
+}
+
 // Sistema de tokens para cancelar requests obsoletos
 class RequestController {
     constructor() {
@@ -215,8 +225,8 @@ async function loadFilterOptions() {
         // Cargar grados y secciones en paralelo
         console.log('[FETCH] Obteniendo grados y secciones...');
         const [gradosResponse, seccionesResponse] = await Promise.all([
-            fetch(`${API_BASE_URL}/grados`),
-            fetch(`${API_BASE_URL}/secciones`)
+            fetch(`${API_BASE_URL}/grados`, {headers: getAuthHeaders()}),
+            fetch(`${API_BASE_URL}/secciones`, {headers: getAuthHeaders()})
         ]);
 
         // Verificar que la request siga siendo activa
@@ -338,7 +348,7 @@ async function loadStudents(page = 1, limit = 24) {
         // Si no está en caché, hacer la llamada
         if (!data) {
             console.log('[FETCH] Obteniendo estudiantes de página', page);
-            const response = await fetch(url);
+            const response = await fetch(url, {headers: getAuthHeaders()});
 
             if (!requestController.isActive(token)) {
                 console.log('[CANCEL] Request de estudiantes cancelada');
@@ -1160,9 +1170,7 @@ async function updateStudentData(formData) {
     promises.push(
         fetch(`${API_BASE_URL}/students/${currentStudent.id}`, {
             method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: getAuthHeaders(),
             body: JSON.stringify(studentData)
         })
     );
@@ -1179,9 +1187,7 @@ async function updateStudentData(formData) {
         promises.push(
             fetch(`${API_BASE_URL}/apoderados/${currentStudent.apoderado.id}`, {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(apoderadoData)
             })
         );
@@ -1206,9 +1212,7 @@ async function updateStudentData(formData) {
             promises.push(
                 fetch(`${API_BASE_URL}/direcciones/${direccionId}`, {
                     method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify(direccionData)
                 })
             );
@@ -1417,9 +1421,7 @@ async function saveNewStudent() {
 
         const response = await fetch(`${API_BASE_URL}/students`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: getAuthHeaders(),
             body: JSON.stringify(formData)
         });
 
@@ -1476,9 +1478,7 @@ async function deleteStudent() {
 
         const response = await fetch(`${API_BASE_URL}/students/${currentStudent.id}`, {
             method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json'
-            }
+            headers: getAuthHeaders()
         });
 
         if (!response.ok) {

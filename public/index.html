@@ -4,215 +4,61 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Estudiantes</title>
-    <link rel="stylesheet" href="styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .loading {
+            text-align: center;
+            color: white;
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid white;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
-    <div class="app-container">
-        <header class="app-header">
-            <div class="header-content">
-                <div>
-                    <img class="logo-school" src="assets/logo.jpg" alt="Logo">
-                </div>
-                <div class="logo-section">
-                    <span class="material-icons logo-icon">school</span>
-                    <h1 class="app-title">Sistema de Estudiantes</h1>
-                </div>
-                <div class="stats-section">
-                    <div class="stat-card">
-                        <span class="stat-number" id="totalEstudiantes">0</span>
-                        <span class="stat-label">Estudiantes</span>
-                    </div>
-                </div>
-            </div>
-        </header>
-
-        <main class="main-content">
-            <div class="search-container">
-                <div class="search-box">
-                    <span class="material-icons search-icon">search</span>
-                    <input type="text" id="searchInput" placeholder="Buscar por nombre, apellido, DNI...">
-                    <button class="filter-toggle" id="filterToggle">
-                        <span class="material-icons">tune</span>
-                    </button>
-                </div>
-
-                <div class="filters-panel" id="filtersPanel">
-                    <div class="filter-group">
-                        <label for="gradoFilter">Grado:</label>
-                        <select id="gradoFilter">
-                            <option value="">Todos los grados</option>
-                        </select>
-                    </div>
-                    
-                    <div class="filter-group">
-                        <label for="seccionFilter">Sección:</label>
-                        <select id="seccionFilter">
-                            <option value="">Todas las secciones</option>
-                        </select>
-                    </div>
-
-                    <div class="filter-group">
-                        <label for="sexoFilter">Sexo:</label>
-                        <select id="sexoFilter">
-                            <option value="">Todos</option>
-                            <option value="M">Masculino</option>
-                            <option value="F">Femenino</option>
-                        </select>
-                    </div>
-
-                    <div class="filter-group">
-                        <label for="searchType">Tipo de búsqueda:</label>
-                        <select id="searchType">
-                            <option value="general">General</option>
-                            <option value="estudiante">Solo estudiantes</option>
-                            <option value="apoderado">Solo apoderados</option>
-                            <option value="dni">Por DNI</option>
-                        </select>
-                    </div>
-
-                    <button class="clear-filters" id="clearFilters">
-                        <span class="material-icons">clear</span>
-                        Limpiar filtros
-                    </button>
-                </div>
-            </div>
-
-            <div class="results-container">
-                <div class="results-header">
-                    <h2 id="resultsTitle">Resultados</h2>
-                    <span class="results-count" id="resultsCount">0 resultados</span>
-                </div>
-
-                <div class="loading-spinner" id="loadingSpinner">
-                    <div class="spinner"></div>
-                    <span>Cargando...</span>
-                </div>
-
-                <div class="list-header" id="listHeader" style="display: none;">
-                    <div class="header-avatar"></div>
-                    <div class="header-content">
-                        <div class="header-section left">Estudiante</div>
-                        <div class="header-section">Información Personal</div>
-                        <div class="header-section">Académico</div>
-                        <div class="header-section">Apoderado</div>
-                        <div class="header-section">Ubicación</div>
-                    </div>
-                </div>
-
-                <div class="results-grid" id="resultsGrid">
-                    <!-- Resultados se cargarán aquí -->
-                </div>
-
-                <div class="pagination-container" id="paginationContainer">
-                    <div class="pagination-info">
-                        <span id="paginationInfo">Página 1 de 1</span>
-                        <select id="pageSize" class="page-size-select">
-                            <option value="12">12 por página</option>
-                            <option value="24" selected>24 por página</option>
-                            <option value="48">48 por página</option>
-                            <option value="96">96 por página</option>
-                        </select>
-                    </div>
-                    
-                    <div class="pagination-controls">
-                        <button class="pagination-btn" id="firstPageBtn" title="Primera página">
-                            <span class="material-icons">first_page</span>
-                        </button>
-                        <button class="pagination-btn" id="prevPageBtn" title="Página anterior">
-                            <span class="material-icons">chevron_left</span>
-                        </button>
-                        
-                        <div class="page-numbers" id="pageNumbers">
-                            <!-- Números de página se generarán aquí -->
-                        </div>
-                        
-                        <button class="pagination-btn" id="nextPageBtn" title="Página siguiente">
-                            <span class="material-icons">chevron_right</span>
-                        </button>
-                        <button class="pagination-btn" id="lastPageBtn" title="Última página">
-                            <span class="material-icons">last_page</span>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="no-results" id="noResults" style="display: none;">
-                    <span class="material-icons">search_off</span>
-                    <h3>No se encontraron resultados</h3>
-                    <p>Intenta ajustar los filtros o modificar la búsqueda</p>
-                </div>
-            </div>
-        </main>
+    <div class="loading">
+        <div class="spinner"></div>
+        <p>Cargando...</p>
     </div>
 
-    <!-- Modal para detalles del estudiante -->
-    <div class="modal-overlay" id="modalOverlay">
-        <div class="modal">
-            <div class="modal-header">
-                <h3 id="modalTitle">Detalles del Estudiante</h3>
-                <div class="modal-actions">
-                    <button class="edit-toggle-btn" id="editToggleBtn">
-                        <span class="material-icons">edit</span>
-                        <span class="btn-text">Editar</span>
-                    </button>
-                    <button class="delete-btn" id="deleteStudentBtn" title="Eliminar estudiante">
-                        <span class="material-icons">delete</span>
-                        <span class="btn-text">Eliminar</span>
-                    </button>
-                    <button class="modal-close" id="modalClose">
-                        <span class="material-icons">close</span>
-                    </button>
-                </div>
-            </div>
-            <div class="modal-content" id="modalContent">
-                <!-- Contenido del modal se cargará aquí -->
-            </div>
-            <div class="modal-footer" id="modalFooter" style="display: none;">
-                <button class="cancel-btn" id="cancelEditBtn">
-                    <span class="material-icons">close</span>
-                    Cancelar
-                </button>
-                <button class="save-btn" id="saveEditBtn">
-                    <span class="material-icons">save</span>
-                    Guardar Cambios
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Botón flotante para agregar estudiante -->
-    <button class="fab-btn" id="addStudentBtn" title="Agregar nuevo estudiante">
-        <span class="material-icons">person_add</span>
-    </button>
-
-    <!-- Modal para agregar nuevo estudiante -->
-    <div class="modal-overlay" id="addStudentModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h3>Agregar Nuevo Estudiante</h3>
-                <div class="modal-actions">
-                    <button class="modal-close" id="addStudentModalClose">
-                        <span class="material-icons">close</span>
-                    </button>
-                </div>
-            </div>
-            <div class="modal-content" id="addStudentContent">
-                <!-- Contenido del formulario se cargará aquí -->
-            </div>
-            <div class="modal-footer">
-                <button class="cancel-btn" id="cancelAddBtn">
-                    <span class="material-icons">close</span>
-                    Cancelar
-                </button>
-                <button class="save-btn" id="saveAddBtn">
-                    <span class="material-icons">person_add</span>
-                    Agregar Estudiante
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <script src="script.js"></script>
+    <script src="auth.js"></script>
+    <script>
+        // Redirigir basado en estado de autenticación
+        document.addEventListener('DOMContentLoaded', async () => {
+            const token = SessionManager.getToken();
+            
+            if (!token) {
+                // No hay sesión, ir a login
+                window.location.href = '/login.html';
+            } else {
+                // Hay sesión, verificar que sea válida y ir a app
+                const user = await AuthManager.getCurrentUser();
+                if (user) {
+                    window.location.href = '/app.html';
+                } else {
+                    // Token inválido, ir a login
+                    window.location.href = '/login.html';
+                }
+            }
+        });
+    </script>
 </body>
 </html>

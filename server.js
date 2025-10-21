@@ -2,6 +2,8 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 const supabase = require('./db');
+const authRoutes = require('./routes/auth');
+const {verifyAuth, verifyAdmin} = require('./middleware/verifyAuth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -10,11 +12,24 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
+// Rutas de autenticación (sin protección)
+app.use('/api/auth', authRoutes);
+
 app.get('/', (req, res) => {
 	res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.get('/api/students', async (req, res) => {
+// Ruta para la página de login
+app.get('/login', (req, res) => {
+	res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+// Ruta para la aplicación principal (después del login)
+app.get('/app', (req, res) => {
+	res.sendFile(path.join(__dirname, 'public', 'app.html'));
+});
+
+app.get('/api/students', verifyAuth, async (req, res) => {
 	try {
 		const page = parseInt(req.query.page) || 1;
 		const limit = parseInt(req.query.limit) || 24;
@@ -104,7 +119,7 @@ app.get('/api/students', async (req, res) => {
 	}
 });
 
-app.get('/api/students/:id', async (req, res) => {
+app.get('/api/students/:id', verifyAuth, async (req, res) => {
 	try {
 		const {data, error} = await supabase
 			.from('estudiantes')
@@ -164,7 +179,7 @@ app.get('/api/students/:id', async (req, res) => {
 	}
 });
 
-app.get('/api/search', async (req, res) => {
+app.get('/api/search', verifyAuth, async (req, res) => {
 	try {
 		const {q, type, grado, seccion, sexo} = req.query;
 		const page = parseInt(req.query.page) || 1;
@@ -298,7 +313,7 @@ app.get('/api/search', async (req, res) => {
 	}
 });
 
-app.post('/api/students', async (req, res) => {
+app.post('/api/students', verifyAuth, verifyAdmin, async (req, res) => {
 	try {
 		const {
 			nombres,
@@ -396,7 +411,7 @@ app.post('/api/students', async (req, res) => {
 	}
 });
 
-app.put('/api/students/:id', async (req, res) => {
+app.put('/api/students/:id', verifyAuth, verifyAdmin, async (req, res) => {
 	try {
 		const {
 			nombres,
@@ -443,7 +458,7 @@ app.put('/api/students/:id', async (req, res) => {
 	}
 });
 
-app.put('/api/apoderados/:id', async (req, res) => {
+app.put('/api/apoderados/:id', verifyAuth, verifyAdmin, async (req, res) => {
 	try {
 		const {nombres, apellidos, dni, fecha_nacimiento, celular} = req.body;
 		const {error} = await supabase
@@ -464,7 +479,7 @@ app.put('/api/apoderados/:id', async (req, res) => {
 	}
 });
 
-app.put('/api/direcciones/:id', async (req, res) => {
+app.put('/api/direcciones/:id', verifyAuth, verifyAdmin, async (req, res) => {
 	try {
 		const {departamento, provincia, distrito, domicilio} = req.body;
 		const {error} = await supabase
@@ -484,7 +499,7 @@ app.put('/api/direcciones/:id', async (req, res) => {
 	}
 });
 
-app.delete('/api/students/:id', async (req, res) => {
+app.delete('/api/students/:id', verifyAuth, verifyAdmin, async (req, res) => {
 	try {
 		const {data: student, error: getError} = await supabase
 			.from('estudiantes')
@@ -523,7 +538,7 @@ app.delete('/api/students/:id', async (req, res) => {
 	}
 });
 
-app.get('/api/grados', async (req, res) => {
+app.get('/api/grados', verifyAuth, async (req, res) => {
 	try {
 		const {data, error} = await supabase
 			.from('aulas')
@@ -538,7 +553,7 @@ app.get('/api/grados', async (req, res) => {
 	}
 });
 
-app.get('/api/secciones', async (req, res) => {
+app.get('/api/secciones', verifyAuth, async (req, res) => {
 	try {
 		const {data, error} = await supabase
 			.from('aulas')
@@ -553,7 +568,7 @@ app.get('/api/secciones', async (req, res) => {
 	}
 });
 
-app.get('/api/aula', async (req, res) => {
+app.get('/api/aula', verifyAuth, async (req, res) => {
 	try {
 		const {grado, seccion} = req.query;
 		if (!grado || !seccion) {
@@ -578,7 +593,7 @@ app.get('/api/aula', async (req, res) => {
 	}
 });
 
-app.get('/api/stats', async (req, res) => {
+app.get('/api/stats', verifyAuth, async (req, res) => {
 	try {
 		const stats = {};
 		const {count: totalStudents} = await supabase
