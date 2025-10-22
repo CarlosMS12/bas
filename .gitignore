@@ -11,6 +11,9 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+# Archivo de configuración generado (no subir al repo)
+public/config.js
+
 # Logs
 logs
 *.log

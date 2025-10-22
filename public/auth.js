@@ -1,97 +1,65 @@
 /**
- * Módulo de Autenticación del Frontend
- * Maneja login, registro, logout y gestión de sesiones
+ * Módulo de Autenticación del Frontend - Supabase Auth Directo
+ * Maneja login, registro, logout y gestión de sesiones usando Supabase Auth
  */
 
 class AuthManager {
-	static apiUrl = 'http://localhost:3000/api/auth';
-
 	/**
-	 * Registrar un nuevo usuario
+	 * Registrar un nuevo usuario con Supabase Auth
 	 */
-	static async register(email, password, fullName, role) {
+	static async register(email, password, fullName, role = 'profesor') {
 		try {
-			const response = await fetch(`${this.apiUrl}/register`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
+			// Registrar con Supabase Auth
+			const {data, error} = await supabaseClient.auth.signUp({
+				email,
+				password,
+				options: {
+					data: {
+						full_name: fullName,
+						role: role,
+					},
 				},
-				body: JSON.stringify({
-					email,
-					password,
-					full_name: fullName,
-					role,
-				}),
 			});
 
-			const data = await response.json();
-
-			if (!response.ok) {
+			if (error) {
 				return {
 					success: false,
-					error: data.error || 'Error al registrar',
+					error: error.message || 'Error al registrar',
 				};
 			}
 
-			// Si requiere confirmación de email, intentar el endpoint de desarrollo
-			if (data.requiresEmailConfirmation) {
-				console.log(
-					'[AUTH] Email requiere confirmación, intentando endpoint de desarrollo...'
-				);
-				try {
-					const confirmResponse = await fetch(`${this.apiUrl}/dev-confirm-email`, {
-						method: 'POST',
-						headers: {
-							'Content-Type': 'application/json',
-						},
-						body: JSON.stringify({
-							email,
-							password,
-						}),
-					});
+			// Usuario creado exitosamente
+			if (data.user) {
+				// Guardar en SessionManager para compatibilidad
+				const userData = {
+					id: data.user.id,
+					email: data.user.email,
+					full_name: fullName,
+					role: role,
+				};
 
-					const confirmData = await confirmResponse.json();
+				SessionManager.setUser(userData);
 
-					if (confirmResponse.ok && confirmData.token) {
-						console.log('[AUTH] Email confirmado mediante endpoint de desarrollo');
-						SessionManager.setToken(confirmData.token);
-						SessionManager.setUser({
-							email,
-							full_name: fullName,
-							role,
-						});
-						return {
-							success: true,
-							user: {
-								email,
-								full_name: fullName,
-								role,
-							},
-						};
+				// Si hay sesión activa, guardar token
+				if (data.session) {
+					SessionManager.setToken(data.session.access_token);
+					if (data.session.refresh_token) {
+						SessionManager.setRefreshToken(data.session.refresh_token);
 					}
-				} catch (err) {
-					console.error('[AUTH] Error en dev-confirm-email:', err);
 				}
 
-				// Si no funciona, devolver mensaje amigable
 				return {
-					success: false,
-					error:
-						'Se creó la cuenta pero requiere configuración. Verifica la consola del servidor.',
-					requiresEmailConfirmation: true,
+					success: true,
+					user: userData,
+					message: data.session
+						? 'Registro exitoso'
+						: 'Registro exitoso. Por favor verifica tu email si es requerido.',
 				};
-			}
-
-			// Guardar token y sesión
-			SessionManager.setToken(data.token);
-			SessionManager.setUser(data.user);
-			if (data.session?.refresh_token) {
-				SessionManager.setRefreshToken(data.session.refresh_token);
 			}
 
 			return {
-				success: true,
-				user: data.user,
+				success: false,
+				error: 'No se pudo crear el usuario',
 			};
 		} catch (error) {
 			console.error('Error en registro:', error);
@@ -103,40 +71,46 @@ class AuthManager {
 	}
 
 	/**
-	 * Iniciar sesión
+	 * Iniciar sesión con Supabase Auth
 	 */
 	static async login(email, password) {
 		try {
-			const response = await fetch(`${this.apiUrl}/login`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({
-					email,
-					password,
-				}),
+			const {data, error} = await supabaseClient.auth.signInWithPassword({
+				email,
+				password,
 			});
 
-			const data = await response.json();
-
-			if (!response.ok) {
+			if (error) {
 				return {
 					success: false,
-					error: data.error || 'Error al iniciar sesión',
+					error: error.message || 'Error al iniciar sesión',
 				};
 			}
 
-			// Guardar token y sesión
-			SessionManager.setToken(data.token);
-			SessionManager.setUser(data.user);
-			if (data.session?.refresh_token) {
-				SessionManager.setRefreshToken(data.session.refresh_token);
+			if (data.user && data.session) {
+				// Guardar en SessionManager
+				const userData = {
+					id: data.user.id,
+					email: data.user.email,
+					full_name: data.user.user_metadata?.full_name || data.user.email,
+					role: data.user.user_metadata?.role || 'profesor',
+				};
+
+				SessionManager.setToken(data.session.access_token);
+				SessionManager.setUser(userData);
+				if (data.session.refresh_token) {
+					SessionManager.setRefreshToken(data.session.refresh_token);
+				}
+
+				return {
+					success: true,
+					user: userData,
+				};
 			}
 
 			return {
-				success: true,
-				user: data.user,
+				success: false,
+				error: 'No se pudo iniciar sesión',
 			};
 		} catch (error) {
 			console.error('Error en login:', error);
@@ -148,30 +122,29 @@ class AuthManager {
 	}
 
 	/**
-	 * Obtener información del usuario actual
+	 * Obtener información del usuario actual desde Supabase
 	 */
 	static async getCurrentUser() {
-		const token = SessionManager.getToken();
-		if (!token) {
-			return null;
-		}
-
 		try {
-			const response = await fetch(`${this.apiUrl}/me`, {
-				headers: {
-					Authorization: `Bearer ${token}`,
-				},
-			});
+			const {
+				data: {user},
+				error,
+			} = await supabaseClient.auth.getUser();
 
-			if (!response.ok) {
-				// Token inválido o expirado
+			if (error || !user) {
 				SessionManager.clear();
 				return null;
 			}
 
-			const data = await response.json();
-			SessionManager.setUser(data.user);
-			return data.user;
+			const userData = {
+				id: user.id,
+				email: user.email,
+				full_name: user.user_metadata?.full_name || user.email,
+				role: user.user_metadata?.role || 'profesor',
+			};
+
+			SessionManager.setUser(userData);
+			return userData;
 		} catch (error) {
 			console.error('Error obteniendo usuario actual:', error);
 			return null;
@@ -179,59 +152,37 @@ class AuthManager {
 	}
 
 	/**
-	 * Cerrar sesión
+	 * Cerrar sesión con Supabase Auth
 	 */
 	static async logout() {
-		const token = SessionManager.getToken();
-		if (!token) {
+		try {
+			await supabaseClient.auth.signOut();
+		} catch (error) {
+			console.error('Error en logout:', error);
+		} finally {
 			SessionManager.clear();
 			return {success: true};
 		}
-
-		try {
-			await fetch(`${this.apiUrl}/logout`, {
-				method: 'POST',
-				headers: {
-					Authorization: `Bearer ${token}`,
-				},
-			});
-		} catch (error) {
-			console.error('Error en logout:', error);
-		}
-
-		// Limpiar sesión local independientemente
-		SessionManager.clear();
-		return {success: true};
 	}
 
 	/**
-	 * Refrescar token
+	 * Refrescar token con Supabase Auth
 	 */
 	static async refreshToken() {
-		const refreshToken = SessionManager.getRefreshToken();
-		if (!refreshToken) {
-			return null;
-		}
-
 		try {
-			const response = await fetch(`${this.apiUrl}/refresh`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({
-					refresh_token: refreshToken,
-				}),
-			});
+			const {data, error} = await supabaseClient.auth.refreshSession();
 
-			if (!response.ok) {
+			if (error || !data.session) {
 				SessionManager.clear();
 				return null;
 			}
 
-			const data = await response.json();
-			SessionManager.setToken(data.token);
-			return data.token;
+			SessionManager.setToken(data.session.access_token);
+			if (data.session.refresh_token) {
+				SessionManager.setRefreshToken(data.session.refresh_token);
+			}
+
+			return data.session.access_token;
 		} catch (error) {
 			console.error('Error refrescando token:', error);
 			return null;

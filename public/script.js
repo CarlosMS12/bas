@@ -2,17 +2,8 @@
 // CONFIGURACIÓN Y CONTROL DE RACE CONDITIONS
 // ==========================================
 
-const API_BASE_URL = '/api';
-
-// Función helper para obtener headers con autenticación
-function getAuthHeaders() {
-    const authHeader = SessionManager.getAuthHeader();
-    const headers = {'Content-Type': 'application/json'};
-    if (authHeader) {
-        Object.assign(headers, authHeader);
-    }
-    return headers;
-}
+// Ya no necesitamos API_BASE_URL ni getAuthHeaders() 
+// porque usamos API_Services que llama directamente a Supabase
 
 // Sistema de tokens para cancelar requests obsoletos
 class RequestController {
@@ -211,7 +202,7 @@ async function loadFilterOptions() {
 
     try {
         // Usar caché si está disponible
-        const cacheKey = cacheManager.getCacheKey(`${API_BASE_URL}/filter-options`);
+        const cacheKey = cacheManager.getCacheKey('filter-options');
         let cachedOptions = cacheManager.get(cacheKey);
 
         if (cachedOptions) {
@@ -224,28 +215,14 @@ async function loadFilterOptions() {
 
         // Cargar grados y secciones en paralelo
         console.log('[FETCH] Obteniendo grados y secciones...');
-        const [gradosResponse, seccionesResponse] = await Promise.all([
-            fetch(`${API_BASE_URL}/grados`, {headers: getAuthHeaders()}),
-            fetch(`${API_BASE_URL}/secciones`, {headers: getAuthHeaders()})
+        const [gradosData, seccionesData] = await Promise.all([
+            API_Services.getGrados(),
+            API_Services.getSecciones()
         ]);
 
         // Verificar que la request siga siendo activa
         if (!requestController.isActive(token)) {
             console.log('[CANCEL] Request de filter options cancelada');
-            return;
-        }
-
-        // Validar respuestas
-        if (!gradosResponse.ok || !seccionesResponse.ok) {
-            throw new Error('Error al cargar opciones de filtro');
-        }
-
-        const gradosData = await gradosResponse.json();
-        const seccionesData = await seccionesResponse.json();
-
-        // Validar que no sea una request obsoleta
-        if (!requestController.isActive(token)) {
-            console.log('[CANCEL] Request de filter options cancelada después de parsear JSON');
             return;
         }
 
@@ -318,27 +295,21 @@ async function loadStudents(page = 1, limit = 24) {
         const hasFilters = currentFilters.search || currentFilters.grado ||
             currentFilters.seccion || currentFilters.sexo;
 
-        let url = hasFilters ? `${API_BASE_URL}/search` : `${API_BASE_URL}/students`;
+        let url = hasFilters ? 'search' : 'students';
 
-        const params = new URLSearchParams({
-            page: page.toString(),
-            limit: limit.toString()
-        });
-
+        // Preparar filtros para API_Services
+        const filters = {};
         if (hasFilters) {
-            if (currentFilters.search) params.append('q', currentFilters.search);
-            if (currentFilters.grado) params.append('grado', currentFilters.grado);
-            if (currentFilters.seccion) params.append('seccion', currentFilters.seccion);
-            if (currentFilters.sexo) params.append('sexo', currentFilters.sexo);
-            if (currentFilters.searchType) params.append('type', currentFilters.searchType);
+            if (currentFilters.search) filters.search = currentFilters.search;
+            if (currentFilters.grado) filters.grado = currentFilters.grado;
+            if (currentFilters.seccion) filters.seccion = currentFilters.seccion;
+            if (currentFilters.sexo) filters.sexo = currentFilters.sexo;
         }
-
-        url += '?' + params.toString();
 
         // Intentar obtener del caché si NO hay filtros
         let data = null;
         if (!hasFilters) {
-            const cacheKey = cacheManager.getCacheKey(url);
+            const cacheKey = cacheManager.getCacheKey(url, {page, limit});
             data = cacheManager.get(cacheKey);
             if (data) {
                 console.log('[CACHE] Usando datos de estudiantes en caché');
@@ -348,27 +319,20 @@ async function loadStudents(page = 1, limit = 24) {
         // Si no está en caché, hacer la llamada
         if (!data) {
             console.log('[FETCH] Obteniendo estudiantes de página', page);
-            const response = await fetch(url, {headers: getAuthHeaders()});
+            
+            // Usar API_Services en lugar de fetch
+            data = hasFilters 
+                ? await API_Services.searchStudents(filters, page, limit)
+                : await API_Services.getStudents(page, limit);
 
             if (!requestController.isActive(token)) {
                 console.log('[CANCEL] Request de estudiantes cancelada');
                 return;
             }
 
-            if (!response.ok) {
-                throw new Error('Error al cargar estudiantes');
-            }
-
-            data = await response.json();
-
-            if (!requestController.isActive(token)) {
-                console.log('[CANCEL] Request de estudiantes cancelada después de parsear JSON');
-                return;
-            }
-
             // Guardar en caché si NO hay filtros
             if (!hasFilters) {
-                const cacheKey = cacheManager.getCacheKey(url);
+                const cacheKey = cacheManager.getCacheKey(url, {page, limit});
                 cacheManager.set(cacheKey, data);
             }
         }
@@ -534,8 +498,15 @@ async function resetToFirstPage() {
 }
 
 async function goToPage(page) {
-    if (page < 1 || page > currentPagination.totalPages) {
+    // Permitir ir a página 1 siempre (para recargas)
+    if (page < 1) {
         console.warn('[NAV] Página inválida:', page);
+        return;
+    }
+    
+    // Solo validar totalPages si ya hay datos cargados y no es página 1
+    if (page > 1 && currentPagination.totalPages > 0 && page > currentPagination.totalPages) {
+        console.warn('[NAV] Página inválida:', page, '(total:', currentPagination.totalPages + ')');
         return;
     }
 
@@ -1167,12 +1138,9 @@ async function updateStudentData(formData) {
         discapacidad: formData.discapacidad || null
     };
 
+    // Actualizar estudiante usando API_Services
     promises.push(
-        fetch(`${API_BASE_URL}/students/${currentStudent.id}`, {
-            method: 'PUT',
-            headers: getAuthHeaders(),
-            body: JSON.stringify(studentData)
-        })
+        API_Services.updateStudent(currentStudent.id, studentData)
     );
 
     if (currentStudent.apoderado && formData.apoderado && currentStudent.apoderado.id) {
@@ -1184,12 +1152,9 @@ async function updateStudentData(formData) {
             celular: formData.apoderado.celular || null
         };
 
+        // Actualizar apoderado usando API_Services
         promises.push(
-            fetch(`${API_BASE_URL}/apoderados/${currentStudent.apoderado.id}`, {
-                method: 'PUT',
-                headers: getAuthHeaders(),
-                body: JSON.stringify(apoderadoData)
-            })
+            API_Services.updateApoderado(currentStudent.apoderado.id, apoderadoData)
         );
     }
 
@@ -1209,24 +1174,14 @@ async function updateStudentData(formData) {
                 domicilio: formData.direccion.domicilio || null
             };
 
+            // Actualizar dirección usando API_Services
             promises.push(
-                fetch(`${API_BASE_URL}/direcciones/${direccionId}`, {
-                    method: 'PUT',
-                    headers: getAuthHeaders(),
-                    body: JSON.stringify(direccionData)
-                })
+                API_Services.updateDireccion(direccionId, direccionData)
             );
         }
     }
 
-    const responses = await Promise.all(promises);
-
-    for (const response of responses) {
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Error al actualizar datos');
-        }
-    }
+    await Promise.all(promises);
 }
 
 // ==========================================
@@ -1419,18 +1374,9 @@ async function saveNewStudent() {
             Guardando...
         `;
 
-        const response = await fetch(`${API_BASE_URL}/students`, {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify(formData)
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Error al crear estudiante');
-        }
-
-        const result = await response.json();
+        // Crear estudiante usando API_Services
+        const result = await API_Services.createStudent(formData);
+        
         showSuccess('Estudiante creado exitosamente');
 
         // Invalidar caché
@@ -1476,17 +1422,9 @@ async function deleteStudent() {
             <span class="btn-text">Eliminando...</span>
         `;
 
-        const response = await fetch(`${API_BASE_URL}/students/${currentStudent.id}`, {
-            method: 'DELETE',
-            headers: getAuthHeaders()
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Error al eliminar estudiante');
-        }
-
-        const result = await response.json();
+        // Eliminar estudiante usando API_Services
+        const result = await API_Services.deleteStudent(currentStudent.id);
+        
         showSuccess(`Estudiante ${studentName} eliminado exitosamente`);
 
         // Invalidar caché
