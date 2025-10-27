@@ -98,9 +98,25 @@ export function AuthProvider({children}) {
 			});
 
 			if (error) {
+				// Mapear mensajes de error a mensajes amigables
+				let friendlyError = error.message || 'Error al iniciar sesión';
+
+				if (
+					error.message.includes('Failed to fetch') ||
+					error.message.includes('NetworkError')
+				) {
+					friendlyError = 'Error de conexión. Verifica tu internet.';
+				} else if (error.message.includes('Invalid login credentials')) {
+					friendlyError = 'Credenciales incorrectas. Verifica email y contraseña.';
+				} else if (error.message.includes('User not found')) {
+					friendlyError = 'Usuario no encontrado.';
+				} else if (error.message.includes('Email not confirmed')) {
+					friendlyError = 'Email no verificado. Revisa tu bandeja de entrada.';
+				}
+
 				return {
 					success: false,
-					error: error.message || 'Error al iniciar sesión',
+					error: friendlyError,
 				};
 			}
 
@@ -120,9 +136,15 @@ export function AuthProvider({children}) {
 			};
 		} catch (error) {
 			console.error('Error en login:', error);
+			let friendlyError = 'Error de conexión. Intenta de nuevo.';
+
+			if (error.message && error.message.includes('Failed to fetch')) {
+				friendlyError = 'Error de conexión. Verifica tu internet.';
+			}
+
 			return {
 				success: false,
-				error: error.message || 'Error de conexión',
+				error: friendlyError,
 			};
 		}
 	}, []);

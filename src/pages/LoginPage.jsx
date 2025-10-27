@@ -76,6 +76,26 @@ export function LoginPage() {
 					maxWidth: '400px',
 				}}
 			>
+				{/* Notification - Above header */}
+				{notification && (
+					<div
+						style={{
+							padding: '12px 20px',
+							borderRadius: '0',
+							fontSize: '13px',
+							animation: 'slideDown 0.3s ease',
+							borderLeft: '3px solid #b00020',
+							background: '#fef2f2',
+							border: '1px solid #fecaca',
+							borderRadius: '12px 12px 0 0',
+							color: '#b00020',
+							fontWeight: '500',
+						}}
+					>
+						{notification.message}
+					</div>
+				)}
+
 				{/* Header */}
 				<div
 					style={{
@@ -133,24 +153,6 @@ export function LoginPage() {
 
 				{/* Body */}
 				<div style={{padding: '30px'}}>
-					{notification && (
-						<div
-							style={{
-								padding: '10px 12px',
-								borderRadius: '6px',
-								marginBottom: '15px',
-								fontSize: '13px',
-								animation: 'slideDown 0.3s ease',
-								borderLeft: '3px solid #b00020',
-								background: '#fef2f2',
-								border: '1px solid #fecaca',
-								color: '#b00020',
-							}}
-						>
-							{notification.message}
-						</div>
-					)}
-
 					<form
 						onSubmit={handleSubmit}
 						style={{display: 'flex', flexDirection: 'column', gap: '18px'}}
