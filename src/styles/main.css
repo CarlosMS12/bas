@@ -1289,7 +1289,7 @@ body {
 	padding: var(--spacing-lg);
 	border-top: 1px solid #e0e0e0;
 	display: flex;
-	justify-content: flex-end;
+	justify-content: center;
 	gap: var(--spacing-md);
 	background: #fafafa;
 }

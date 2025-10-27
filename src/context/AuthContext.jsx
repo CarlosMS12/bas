@@ -132,11 +132,28 @@ export function AuthProvider({children}) {
 	 */
 	const logout = useCallback(async () => {
 		try {
-			await supabase.auth.signOut();
+			// Intentar cerrar sesión en Supabase
+			const {error} = await supabase.auth.signOut();
+
+			// Incluso si hay error, limpiar el estado local
+			// Esto es importante porque si el usuario fue eliminado en Supabase
+			// o hay problemas de conexión, igual necesitamos limpiar la sesión local
 			setUser(null);
 			setIsAuthenticated(false);
+
+			if (error) {
+				console.warn('Warning al cerrar sesión en Supabase:', error);
+				// Retornar true igual porque limpiamos el estado local
+				return {success: true, warning: true};
+			}
+
+			return {success: true};
 		} catch (error) {
 			console.error('Error en logout:', error);
+			// Asegurar que limpiamos el estado local incluso con error
+			setUser(null);
+			setIsAuthenticated(false);
+			return {success: true, error: error.message};
 		}
 	}, []);
 

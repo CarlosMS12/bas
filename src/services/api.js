@@ -510,6 +510,8 @@ export async function searchStudents(filters = {}, page = 1, limit = 24) {
 
 		// Ordenar y paginar
 		const {data, count, error} = await query
+			.order('aulas(grado)', {ascending: true})
+			.order('aulas(seccion)', {ascending: true})
 			.order('apellidos', {ascending: true})
 			.range(offset, offset + limit - 1);
 

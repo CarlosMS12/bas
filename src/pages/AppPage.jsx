@@ -10,6 +10,7 @@ import {StudentDetailModal} from '../components/StudentDetailModal';
 import {AddStudentModal} from '../components/AddStudentModal';
 import {Notification, LoadingSpinner} from '../components/Common';
 import * as api from '../services/api';
+import {supabase} from '../lib/supabase';
 
 export function AppPage() {
 	const navigate = useNavigate();
@@ -37,6 +38,8 @@ export function AppPage() {
 	const [notification, setNotification] = useState(null);
 	const [isSavingStudent, setIsSavingStudent] = useState(false);
 	const [showUserDropdown, setShowUserDropdown] = useState(false);
+	const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+	const [isLoggingOut, setIsLoggingOut] = useState(false);
 
 	// Cerrar dropdown al hacer click fuera
 	useEffect(() => {
@@ -49,6 +52,37 @@ export function AppPage() {
 		document.addEventListener('click', handleClickOutside);
 		return () => document.removeEventListener('click', handleClickOutside);
 	}, [showUserDropdown]);
+
+	// Verificar autenticación periódicamente
+	// Si el usuario fue eliminado en Supabase o hay problemas de conexión, cerrar sesión automáticamente
+	useEffect(() => {
+		const verifyAuthentication = async () => {
+			try {
+				// Verificar si el usuario actual aún existe en Supabase
+				const {data, error} = await supabase.auth.getUser();
+
+				if (error || !data?.user) {
+					// Usuario no autenticado o error de conexión
+					console.warn('Usuario no autenticado, cerrando sesión automáticamente');
+					await logout();
+					navigate('/login');
+				}
+			} catch (error) {
+				console.error('Error verificando autenticación:', error);
+				// En caso de error de conexión, cerrar sesión también
+				await logout();
+				navigate('/login');
+			}
+		};
+
+		// Verificar cada 60 segundos (1 minuto)
+		const interval = setInterval(verifyAuthentication, 60000);
+
+		// También verificar al cargar la página
+		verifyAuthentication();
+
+		return () => clearInterval(interval);
+	}, [navigate, logout]);
 
 	// Cargar grados y secciones una sola vez
 	useEffect(() => {
@@ -238,8 +272,25 @@ export function AppPage() {
 	};
 
 	const handleLogout = async () => {
-		await logout();
-		navigate('/login');
+		try {
+			setIsLoggingOut(true);
+			const result = await logout();
+
+			// Cerrar modal y dropdown
+			setShowLogoutConfirm(false);
+			setShowUserDropdown(false);
+
+			// Redirigir a login
+			navigate('/login');
+		} catch (error) {
+			console.error('Error durante logout:', error);
+			// Igual redirigir aunque haya error
+			setShowLogoutConfirm(false);
+			setShowUserDropdown(false);
+			navigate('/login');
+		} finally {
+			setIsLoggingOut(false);
+		}
 	};
 
 	const showNotification = (message, type = 'error') => {
@@ -370,11 +421,7 @@ export function AppPage() {
 								</div>
 								<div className="user-dropdown-divider"></div>
 								<button
-									onClick={async () => {
-										if (window.confirm('¿Estás seguro de que deseas cerrar sesión?')) {
-											await handleLogout();
-										}
-									}}
+									onClick={() => setShowLogoutConfirm(true)}
 									className="user-dropdown-logout"
 								>
 									<span className="material-icons">logout</span>
@@ -596,6 +643,95 @@ export function AppPage() {
 					type={notification.type}
 					onClose={() => setNotification(null)}
 				/>
+			)}
+
+			{/* Logout Confirmation Modal */}
+			{showLogoutConfirm && (
+				<div className="modal-overlay show">
+					<div
+						className="modal"
+						style={{maxWidth: '400px', borderRadius: '12px', overflow: 'hidden'}}
+					>
+						<div style={{padding: '48px 32px 40px', textAlign: 'center'}}>
+							<p
+								style={{
+									fontSize: '19px',
+									fontWeight: '500',
+									color: '#212121',
+									margin: '0',
+									letterSpacing: '-0.4px',
+									lineHeight: '1.4',
+								}}
+							>
+								¿Cerrar sesión?
+							</p>
+						</div>
+						<div
+							style={{
+								padding: '0 32px 40px',
+								display: 'flex',
+								gap: '20px',
+								justifyContent: 'center',
+								borderTop: 'none',
+							}}
+						>
+							<button
+								onClick={() => setShowLogoutConfirm(false)}
+								style={{
+									minWidth: '120px',
+									padding: '14px 32px',
+									border: 'none',
+									background: '#f5f5f5',
+									borderRadius: '8px',
+									cursor: 'pointer',
+									fontSize: '15px',
+									fontWeight: '500',
+									color: '#424242',
+									transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+									userSelect: 'none',
+								}}
+								onMouseEnter={(e) => (e.currentTarget.style.background = '#eeeeee')}
+								onMouseLeave={(e) => (e.currentTarget.style.background = '#f5f5f5')}
+								disabled={isLoggingOut}
+							>
+								Cancelar
+							</button>
+							<button
+								onClick={handleLogout}
+								style={{
+									minWidth: '120px',
+									padding: '14px 32px',
+									border: 'none',
+									background: '#d32f2f',
+									borderRadius: '8px',
+									cursor: isLoggingOut ? 'not-allowed' : 'pointer',
+									fontSize: '15px',
+									fontWeight: '600',
+									color: 'white',
+									transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+									opacity: isLoggingOut ? 0.7 : 1,
+									letterSpacing: '0.3px',
+									userSelect: 'none',
+								}}
+								onMouseEnter={(e) => {
+									if (!isLoggingOut) {
+										e.currentTarget.style.background = '#b71c1c';
+										e.currentTarget.style.boxShadow = '0 6px 16px rgba(211, 47, 47, 0.25)';
+										e.currentTarget.style.transform = 'translateY(-1px)';
+									}
+								}}
+								onMouseLeave={(e) => {
+									e.currentTarget.style.background = '#d32f2f';
+									e.currentTarget.style.boxShadow = 'none';
+									e.currentTarget.style.transform = 'translateY(0)';
+								}}
+								disabled={isLoggingOut}
+							>
+								{isLoggingOut ? 'Cerrando...' : 'Cerrar sesión'}
+							</button>
+						</div>
+					</div>
+				</div>
 			)}
 		</div>
 	);
