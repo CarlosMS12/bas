@@ -8,32 +8,125 @@ export function AuthProvider({children}) {
 	const [isLoading, setIsLoading] = useState(true);
 	const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+	/**
+	 * Enriquecer usuario con datos de users_profiles (sin timeout)
+	 */
+	const enrichUserWithProfile = useCallback(async (authUser) => {
+		if (!authUser?.id) {
+			console.warn('No hay ID de usuario para enriquecer');
+			return authUser;
+		}
+
+		try {
+			const {data, error} = await supabase
+				.from('users_profiles')
+				.select('full_name, role, school')
+				.eq('id', authUser.id)
+				.single();
+
+			if (error || !data) {
+				console.warn('No se encontraron datos de perfil, usando valores por defecto');
+				return {
+					...authUser,
+					full_name: authUser.user_metadata?.full_name || authUser.email || 'Usuario',
+					role: authUser.user_metadata?.role || 'profesor',
+				};
+			}
+
+			return {
+				...authUser,
+				full_name: data.full_name || authUser.email || 'Usuario',
+				role: data.role || 'profesor',
+				school: data.school,
+			};
+		} catch (error) {
+			console.error('Error enriqueciendo usuario:', error);
+			return {
+				...authUser,
+				full_name: authUser.user_metadata?.full_name || authUser.email || 'Usuario',
+				role: authUser.user_metadata?.role || 'profesor',
+			};
+		}
+	}, []);
+
 	// Inicializar y escuchar cambios de autenticación
 	useEffect(() => {
-		// Obtener sesión inicial
-		supabase.auth.getSession().then(({data: {session}}) => {
-			if (session?.user) {
-				setUser(session.user);
-				setIsAuthenticated(true);
+		let mounted = true;
+
+		const initializeAuth = async () => {
+			try {
+				// Obtener sesión inicial
+				const {
+					data: {session},
+				} = await supabase.auth.getSession();
+
+				if (mounted) {
+					if (session?.user) {
+						// NO enriquecer en la inicialización para no bloquear
+						// Solo usar el usuario de autenticación con datos básicos
+						setUser({
+							...session.user,
+							full_name:
+								session.user.user_metadata?.full_name || session.user.email || 'Usuario',
+							role: session.user.user_metadata?.role || 'profesor',
+						});
+						setIsAuthenticated(true);
+
+						// Enriquecer de forma asincrónica en el fondo
+						enrichUserWithProfile(session.user).then((enrichedUser) => {
+							if (mounted) {
+								setUser(enrichedUser);
+							}
+						});
+					} else {
+						setIsAuthenticated(false);
+					}
+					setIsLoading(false);
+				}
+			} catch (error) {
+				console.error('Error inicializando autenticación:', error);
+				if (mounted) {
+					setIsLoading(false);
+					setIsAuthenticated(false);
+				}
 			}
-			setIsLoading(false);
-		});
+		};
+
+		initializeAuth();
 
 		// Escuchar cambios en la autenticación
 		const {
 			data: {subscription},
-		} = supabase.auth.onAuthStateChange((_event, session) => {
-			if (session?.user) {
-				setUser(session.user);
-				setIsAuthenticated(true);
-			} else {
-				setUser(null);
-				setIsAuthenticated(false);
+		} = supabase.auth.onAuthStateChange(async (_event, session) => {
+			if (mounted) {
+				if (session?.user) {
+					// Mostrar datos básicos inmediatamente
+					setUser({
+						...session.user,
+						full_name:
+							session.user.user_metadata?.full_name || session.user.email || 'Usuario',
+						role: session.user.user_metadata?.role || 'profesor',
+					});
+					setIsAuthenticated(true);
+
+					// Enriquecer de forma asincrónica
+					enrichUserWithProfile(session.user).then((enrichedUser) => {
+						if (mounted) {
+							setUser(enrichedUser);
+						}
+					});
+				} else {
+					setUser(null);
+					setIsAuthenticated(false);
+				}
 			}
 		});
 
-		return () => subscription.unsubscribe();
-	}, []);
+		return () => {
+			mounted = false;
+			subscription.unsubscribe();
+		};
+	}, [enrichUserWithProfile]);
 
 	/**
 	 * Registrar nuevo usuario con Supabase Auth
@@ -62,12 +155,14 @@ export function AuthProvider({children}) {
 
 				// Usuario creado exitosamente
 				if (data.user) {
-					setUser(data.user);
+					// Enriquecer con datos de users_profiles
+					const enrichedUser = await enrichUserWithProfile(data.user);
+					setUser(enrichedUser);
 					setIsAuthenticated(true);
 
 					return {
 						success: true,
-						user: data.user,
+						user: enrichedUser,
 						message: 'Registro exitoso. Por favor verifica tu email si es requerido.',
 					};
 				}
@@ -84,34 +179,65 @@ export function AuthProvider({children}) {
 				};
 			}
 		},
-		[]
+		[enrichUserWithProfile]
 	);
 
 	/**
 	 * Iniciar sesión con Supabase Auth
 	 */
-	const login = useCallback(async (email, password) => {
-		try {
-			const {data, error} = await supabase.auth.signInWithPassword({
-				email,
-				password,
-			});
+	const login = useCallback(
+		async (email, password) => {
+			try {
+				const {data, error} = await supabase.auth.signInWithPassword({
+					email,
+					password,
+				});
 
-			if (error) {
-				// Mapear mensajes de error a mensajes amigables
-				let friendlyError = error.message || 'Error al iniciar sesión';
+				if (error) {
+					// Mapear mensajes de error a mensajes amigables
+					let friendlyError = error.message || 'Error al iniciar sesión';
 
-				if (
-					error.message.includes('Failed to fetch') ||
-					error.message.includes('NetworkError')
-				) {
+					if (
+						error.message.includes('Failed to fetch') ||
+						error.message.includes('NetworkError')
+					) {
+						friendlyError = 'Error de conexión. Verifica tu internet.';
+					} else if (error.message.includes('Invalid login credentials')) {
+						friendlyError = 'Credenciales incorrectas. Verifica email y contraseña.';
+					} else if (error.message.includes('User not found')) {
+						friendlyError = 'Usuario no encontrado.';
+					} else if (error.message.includes('Email not confirmed')) {
+						friendlyError = 'Email no verificado. Revisa tu bandeja de entrada.';
+					}
+
+					return {
+						success: false,
+						error: friendlyError,
+					};
+				}
+
+				if (data.user) {
+					// Enriquecer con datos de users_profiles
+					const enrichedUser = await enrichUserWithProfile(data.user);
+					setUser(enrichedUser);
+					setIsAuthenticated(true);
+
+					return {
+						success: true,
+						user: enrichedUser,
+					};
+				}
+
+				return {
+					success: false,
+					error: 'No se pudo iniciar sesión',
+				};
+			} catch (error) {
+				console.error('Error en login:', error);
+				let friendlyError = 'Error de conexión. Intenta de nuevo.';
+
+				if (error.message && error.message.includes('Failed to fetch')) {
 					friendlyError = 'Error de conexión. Verifica tu internet.';
-				} else if (error.message.includes('Invalid login credentials')) {
-					friendlyError = 'Credenciales incorrectas. Verifica email y contraseña.';
-				} else if (error.message.includes('User not found')) {
-					friendlyError = 'Usuario no encontrado.';
-				} else if (error.message.includes('Email not confirmed')) {
-					friendlyError = 'Email no verificado. Revisa tu bandeja de entrada.';
 				}
 
 				return {
@@ -119,35 +245,9 @@ export function AuthProvider({children}) {
 					error: friendlyError,
 				};
 			}
-
-			if (data.user) {
-				setUser(data.user);
-				setIsAuthenticated(true);
-
-				return {
-					success: true,
-					user: data.user,
-				};
-			}
-
-			return {
-				success: false,
-				error: 'No se pudo iniciar sesión',
-			};
-		} catch (error) {
-			console.error('Error en login:', error);
-			let friendlyError = 'Error de conexión. Intenta de nuevo.';
-
-			if (error.message && error.message.includes('Failed to fetch')) {
-				friendlyError = 'Error de conexión. Verifica tu internet.';
-			}
-
-			return {
-				success: false,
-				error: friendlyError,
-			};
-		}
-	}, []);
+		},
+		[enrichUserWithProfile]
+	);
 
 	/**
 	 * Cerrar sesión con Supabase Auth
@@ -196,9 +296,11 @@ export function AuthProvider({children}) {
 			}
 
 			if (user) {
-				setUser(user);
+				// Enriquecer con datos de users_profiles
+				const enrichedUser = await enrichUserWithProfile(user);
+				setUser(enrichedUser);
 				setIsAuthenticated(true);
-				return user;
+				return enrichedUser;
 			}
 
 			return null;
@@ -206,7 +308,7 @@ export function AuthProvider({children}) {
 			console.error('Error al obtener usuario:', error);
 			return null;
 		}
-	}, []);
+	}, [enrichUserWithProfile]);
 
 	const value = {
 		user,
