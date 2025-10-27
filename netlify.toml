@@ -4,15 +4,13 @@
   # Comando de build
   command = "npm run build"
   
-  # Directorio de salida
+  # Directorio de salida (Vite genera los archivos aquí)
   publish = "dist"
 
 # Configuración de SPA (Single Page Application)
-# Redirige todas las rutas al index.html para que React Router funcione
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+# El archivo _redirects en public/ redirige todas las rutas al index.html
+# Esto permite que React Router maneje todas las rutas
+# NOTA: El archivo _redirects será copiado a dist/ por Vite
 
 # Headers de seguridad
 [[headers]]
@@ -22,6 +20,8 @@
     X-Content-Type-Options = "nosniff"
     X-XSS-Protection = "1; mode=block"
     Referrer-Policy = "strict-origin-when-cross-origin"
+    # Permitir acceso desde cualquier origen (necesario para Supabase)
+    Access-Control-Allow-Origin = "*"
 
 # Cache para assets estáticos
 [[headers]]
