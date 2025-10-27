@@ -36,6 +36,19 @@ export function AppPage() {
 	const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 	const [notification, setNotification] = useState(null);
 	const [isSavingStudent, setIsSavingStudent] = useState(false);
+	const [showUserDropdown, setShowUserDropdown] = useState(false);
+
+	// Cerrar dropdown al hacer click fuera
+	useEffect(() => {
+		const handleClickOutside = (e) => {
+			if (showUserDropdown && !e.target.closest('.user-profile-dropdown-container')) {
+				setShowUserDropdown(false);
+			}
+		};
+
+		document.addEventListener('click', handleClickOutside);
+		return () => document.removeEventListener('click', handleClickOutside);
+	}, [showUserDropdown]);
 
 	// Cargar grados y secciones una sola vez
 	useEffect(() => {
@@ -240,6 +253,12 @@ export function AppPage() {
 	// En su lugar mostramos el spinner únicamente en el área de resultados
 	// cuando corresponde.
 
+	const getInitial = (name) => {
+		return (name || 'U').charAt(0).toUpperCase();
+	};
+
+	const userInitial = getInitial(user?.full_name || user?.email);
+
 	return (
 		<div style={{minHeight: '100vh', background: '#fafafa'}}>
 			{/* Header */}
@@ -255,56 +274,114 @@ export function AppPage() {
 			>
 				<div
 					style={{
-						maxWidth: '1200px',
-						margin: '0 auto',
-						padding: '16px 24px',
 						display: 'flex',
-						justifyContent: 'space-between',
 						alignItems: 'center',
+						justifyContent: 'space-between',
+						flexDirection: 'row',
 					}}
 				>
-					<div>
-						<h1 style={{fontSize: '24px', fontWeight: '600', color: '#212121', margin: 0}}>
-							<span
-								className="material-icons"
-								style={{verticalAlign: 'middle', marginRight: '8px'}}
-							>
+					{/* Spacer izquierdo */}
+					<div style={{paddingLeft: '35px', width: '60px'}}></div>
+
+					{/* Contenido central */}
+					<div
+						style={{
+							maxWidth: '1200px',
+							margin: '0 auto',
+							padding: '16px 24px',
+							display: 'flex',
+							justifyContent: 'space-between',
+							alignItems: 'center',
+							flex: 1,
+						}}
+					>
+						<div>
+							<img
+								src="/assets/logo.jpg"
+								alt="Logo"
+								style={{height: '110px', objectFit: 'cover'}}
+								onError={(e) => {
+									e.target.style.display = 'none';
+								}}
+							/>
+						</div>
+						<div style={{display: 'flex', alignItems: 'center', gap: '16px'}}>
+							<span className="material-icons" style={{fontSize: '32px', color: '#1976d2'}}>
 								school
 							</span>
-							Sistema de Estudiantes
-						</h1>
-					</div>
-
-					<div style={{display: 'flex', alignItems: 'center', gap: '24px'}}>
-						<div
-							style={{display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px'}}
-						>
-							<span className="material-icons" style={{fontSize: '20px', color: '#1976d2'}}>
-								person
-							</span>
-							<span>{user?.full_name || user?.email}</span>
+							<h1 style={{fontSize: '24px', fontWeight: '600', color: '#212121', margin: 0}}>
+								Sistema de Estudiantes
+							</h1>
 						</div>
-						<button
-							onClick={handleLogout}
+						<div
 							style={{
-								padding: '8px 16px',
-								background: '#b00020',
-								color: 'white',
-								border: 'none',
-								borderRadius: '6px',
-								cursor: 'pointer',
-								fontSize: '14px',
-								fontWeight: '500',
 								display: 'flex',
-								alignItems: 'center',
-								gap: '6px',
+								gap: '24px',
 							}}
 						>
-							<span className="material-icons" style={{fontSize: '18px'}}>
-								logout
-							</span>
-							Salir
+							<div
+								style={{
+									display: 'flex',
+									flexDirection: 'column',
+									alignItems: 'center',
+									padding: '8px 16px',
+									background: '#1976d2',
+									color: 'white',
+									borderRadius: '8px',
+									minWidth: '80px',
+								}}
+							>
+								<span style={{fontSize: '20px', fontWeight: '700'}}>
+									{pagination.total || 0}
+								</span>
+								<span style={{fontSize: '12px', opacity: 0.9}}>Estudiantes</span>
+							</div>
+						</div>
+					</div>
+
+					{/* Perfil de usuario */}
+					<div className="user-profile-dropdown-container">
+						<button
+							onClick={() => setShowUserDropdown(!showUserDropdown)}
+							className="user-profile-btn"
+							title="Perfil de usuario"
+						>
+							<div className="user-dropdown-avatar">{userInitial}</div>
 						</button>
+
+						{/* Dropdown Menu */}
+						{showUserDropdown && (
+							<div className="user-dropdown active">
+								<div className="user-dropdown-header">
+									<div className="user-dropdown-avatar">{userInitial}</div>
+									<div className="user-dropdown-info">
+										<div className="user-dropdown-name">
+											Hola {(user?.full_name || 'Usuario')?.split(' ')[0] || 'Usuario'}
+										</div>
+										<div className="user-dropdown-email">{user?.email}</div>
+									</div>
+								</div>
+								<div className="user-dropdown-divider"></div>
+								<div className="user-dropdown-role">
+									Rol:{' '}
+									{user?.role
+										? user.role.charAt(0).toUpperCase() + user.role.slice(1)
+										: 'Usuario'}
+								</div>
+								<div className="user-dropdown-divider"></div>
+								<button
+									onClick={async () => {
+										if (window.confirm('¿Estás seguro de que deseas cerrar sesión?')) {
+											await handleLogout();
+										}
+									}}
+									className="user-dropdown-logout"
+								>
+									<span className="material-icons">logout</span>
+									Cerrar sesión
+								</button>
+							</div>
+						)}
 					</div>
 				</div>
 			</header>
@@ -317,58 +394,16 @@ export function AppPage() {
 					padding: '24px',
 				}}
 			>
-				{/* Controls */}
+				{/* Search and Filters */}
 				<div
 					style={{
 						background: 'white',
-						borderRadius: '8px',
-						padding: '16px',
+						borderRadius: '12px',
+						boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)',
 						marginBottom: '24px',
-						boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12)',
+						overflow: 'hidden',
 					}}
 				>
-					<div
-						style={{
-							display: 'flex',
-							justifyContent: 'space-between',
-							alignItems: 'center',
-							marginBottom: '16px',
-						}}
-					>
-						<div style={{fontSize: '14px', color: '#757575'}}>
-							{students.length > 0 && (
-								<>
-									{(pagination.page - 1) * pagination.limit + 1}-
-									{Math.min(pagination.page * pagination.limit, pagination.total)} de{' '}
-									{pagination.total} resultado
-									{pagination.total !== 1 ? 's' : ''}
-								</>
-							)}
-							{students.length === 0 && '0 resultados'}
-						</div>
-						<button
-							onClick={() => setIsAddModalOpen(true)}
-							style={{
-								padding: '10px 16px',
-								background: '#4caf50',
-								color: 'white',
-								border: 'none',
-								borderRadius: '6px',
-								cursor: 'pointer',
-								fontSize: '14px',
-								fontWeight: '500',
-								display: 'flex',
-								alignItems: 'center',
-								gap: '6px',
-							}}
-						>
-							<span className="material-icons" style={{fontSize: '18px'}}>
-								person_add
-							</span>
-							Agregar Estudiante
-						</button>
-					</div>
-
 					<SearchAndFilters
 						onSearch={handleSearch}
 						grados={grados}
@@ -376,74 +411,162 @@ export function AppPage() {
 					/>
 				</div>
 
-				{/* Students Grid */}
-				{isLoading && students.length === 0 ? (
+				{/* Results Container */}
+				<div
+					style={{
+						background: 'white',
+						borderRadius: '12px',
+						boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)',
+						overflow: 'hidden',
+					}}
+				>
+					{/* Results Header */}
 					<div
 						style={{
-							minHeight: '240px',
-							display: 'flex',
-							justifyContent: 'center',
-							alignItems: 'center',
-							background: 'white',
-							borderRadius: '8px',
 							padding: '24px',
-							boxShadow: '0 1px 3px rgba(0, 0, 0, 0.06)',
+							borderBottom: '1px solid #e0e0e0',
+							display: 'flex',
+							justifyContent: 'space-between',
+							alignItems: 'center',
 						}}
 					>
-						<LoadingSpinner />
+						<h2 style={{fontSize: '18px', fontWeight: '600', color: '#212121', margin: 0}}>
+							Resultados
+						</h2>
+						<span
+							style={{
+								fontSize: '14px',
+								color: '#757575',
+								background: '#f5f5f5',
+								padding: '4px 8px',
+								borderRadius: '8px',
+							}}
+						>
+							{students.length > 0
+								? `${students.length} resultado${students.length !== 1 ? 's' : ''}`
+								: '0 resultados'}
+						</span>
 					</div>
-				) : students.length > 0 ? (
-					<>
+
+					{/* Students List */}
+					{isLoading && students.length === 0 ? (
 						<div
 							style={{
-								display: 'grid',
-								gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+								minHeight: '240px',
+								display: 'flex',
+								flexDirection: 'column',
+								alignItems: 'center',
+								justifyContent: 'center',
+								padding: '48px',
 								gap: '16px',
-								marginBottom: '24px',
+								color: '#757575',
 							}}
 						>
-							{students.map((student) => (
-								<StudentCard
-									key={student.id}
-									student={student}
-									onClick={() => handleStudentClick(student)}
-								/>
-							))}
+							<LoadingSpinner />
 						</div>
+					) : students.length > 0 ? (
+						<>
+							<div
+								style={{
+									display: 'flex',
+									flexDirection: 'column',
+									gap: '8px',
+									padding: '24px',
+								}}
+							>
+								{students.map((student) => (
+									<StudentCard
+										key={student.id}
+										student={student}
+										onClick={() => handleStudentClick(student)}
+									/>
+								))}
+							</div>
 
-						{/* Pagination */}
-						<Pagination
-							pagination={pagination}
-							onPageChange={(page) => updatePagination({page})}
-							onPageSizeChange={(limit) => updatePagination({page: 1, limit})}
-						/>
-					</>
-				) : (
-					<div
-						style={{
-							background: 'white',
-							borderRadius: '8px',
-							padding: '48px 24px',
-							textAlign: 'center',
-							boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12)',
-						}}
-					>
-						<span
-							className="material-icons"
+							{/* Pagination */}
+							<div style={{borderTop: '1px solid #e0e0e0'}}>
+								<Pagination
+									pagination={pagination}
+									onPageChange={(page) => updatePagination({page})}
+									onPageSizeChange={(limit) => updatePagination({page: 1, limit})}
+								/>
+							</div>
+						</>
+					) : (
+						<div
 							style={{
-								fontSize: '48px',
-								color: '#9e9e9e',
-								display: 'block',
-								marginBottom: '16px',
+								display: 'flex',
+								flexDirection: 'column',
+								alignItems: 'center',
+								justifyContent: 'center',
+								padding: '48px',
+								textAlign: 'center',
+								color: '#757575',
 							}}
 						>
-							person_search
-						</span>
-						<p style={{fontSize: '18px', color: '#757575', margin: 0}}>
-							No se encontraron estudiantes
-						</p>
-					</div>
-				)}
+							<span
+								className="material-icons"
+								style={{
+									fontSize: '64px',
+									marginBottom: '16px',
+									opacity: 0.5,
+								}}
+							>
+								search_off
+							</span>
+							<h3 style={{fontSize: '18px', marginBottom: '8px', color: '#212121'}}>
+								No se encontraron resultados
+							</h3>
+							<p style={{margin: 0}}>Intenta ajustar los filtros o modificar la búsqueda</p>
+						</div>
+					)}
+				</div>
+
+				{/* Botón flotante para agregar estudiante */}
+				<button
+					onClick={() => setIsAddModalOpen(true)}
+					style={{
+						position: 'fixed',
+						bottom: '24px',
+						right: '24px',
+						width: '56px',
+						height: '56px',
+						borderRadius: '50%',
+						background: '#1976d2',
+						color: 'white',
+						border: 'none',
+						cursor: 'pointer',
+						display: 'flex',
+						alignItems: 'center',
+						justifyContent: 'center',
+						boxShadow: '0 3px 6px rgba(0, 0, 0, 0.16), 0 3px 6px rgba(0, 0, 0, 0.23)',
+						transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+						zIndex: 1000,
+					}}
+					title="Agregar nuevo estudiante"
+					onMouseEnter={(e) => {
+						e.currentTarget.style.background = '#1565c0';
+						e.currentTarget.style.boxShadow =
+							'0 10px 20px rgba(0, 0, 0, 0.19), 0 6px 6px rgba(0, 0, 0, 0.23)';
+						e.currentTarget.style.transform = 'scale(1.05)';
+					}}
+					onMouseLeave={(e) => {
+						e.currentTarget.style.background = '#1976d2';
+						e.currentTarget.style.boxShadow =
+							'0 3px 6px rgba(0, 0, 0, 0.16), 0 3px 6px rgba(0, 0, 0, 0.23)';
+						e.currentTarget.style.transform = 'scale(1)';
+					}}
+					onMouseDown={(e) => {
+						e.currentTarget.style.transform = 'scale(0.95)';
+					}}
+					onMouseUp={(e) => {
+						e.currentTarget.style.transform = 'scale(1.05)';
+					}}
+				>
+					<span className="material-icons" style={{fontSize: '24px'}}>
+						person_add
+					</span>
+				</button>
 			</main>
 
 			{/* Modals */}

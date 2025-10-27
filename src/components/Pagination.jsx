@@ -18,15 +18,7 @@ export function Pagination({pagination, onPageChange, onPageSizeChange}) {
 				<button
 					key="1"
 					onClick={() => onPageChange(1)}
-					style={{
-						padding: '8px 12px',
-						margin: '0 2px',
-						background: 'white',
-						border: '1px solid #e0e0e0',
-						borderRadius: '4px',
-						cursor: 'pointer',
-						fontSize: '14px',
-					}}
+					className={`page-number ${page === 1 ? 'active' : ''}`}
 				>
 					1
 				</button>
@@ -34,7 +26,7 @@ export function Pagination({pagination, onPageChange, onPageSizeChange}) {
 
 			if (startPage > 2) {
 				pages.push(
-					<span key="ellipsis1" style={{padding: '0 8px', alignSelf: 'center'}}>
+					<span key="ellipsis1" className="page-ellipsis">
 						...
 					</span>
 				);
@@ -46,17 +38,7 @@ export function Pagination({pagination, onPageChange, onPageSizeChange}) {
 				<button
 					key={i}
 					onClick={() => onPageChange(i)}
-					style={{
-						padding: '8px 12px',
-						margin: '0 2px',
-						background: page === i ? '#1976d2' : 'white',
-						color: page === i ? 'white' : '#212121',
-						border: page === i ? 'none' : '1px solid #e0e0e0',
-						borderRadius: '4px',
-						cursor: 'pointer',
-						fontSize: '14px',
-						fontWeight: page === i ? '600' : '400',
-					}}
+					className={`page-number ${page === i ? 'active' : ''}`}
 				>
 					{i}
 				</button>
@@ -66,7 +48,7 @@ export function Pagination({pagination, onPageChange, onPageSizeChange}) {
 		if (endPage < totalPages) {
 			if (endPage < totalPages - 1) {
 				pages.push(
-					<span key="ellipsis2" style={{padding: '0 8px', alignSelf: 'center'}}>
+					<span key="ellipsis2" className="page-ellipsis">
 						...
 					</span>
 				);
@@ -76,15 +58,7 @@ export function Pagination({pagination, onPageChange, onPageSizeChange}) {
 				<button
 					key={totalPages}
 					onClick={() => onPageChange(totalPages)}
-					style={{
-						padding: '8px 12px',
-						margin: '0 2px',
-						background: 'white',
-						border: '1px solid #e0e0e0',
-						borderRadius: '4px',
-						cursor: 'pointer',
-						fontSize: '14px',
-					}}
+					className={`page-number ${page === totalPages ? 'active' : ''}`}
 				>
 					{totalPages}
 				</button>
@@ -95,117 +69,75 @@ export function Pagination({pagination, onPageChange, onPageSizeChange}) {
 	};
 
 	return (
-		<div
-			style={{
-				display: 'flex',
-				justifyContent: 'space-between',
-				alignItems: 'center',
-				padding: '16px',
-				background: 'white',
-				borderRadius: '8px',
-				boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12)',
-				flexWrap: 'wrap',
-				gap: '16px',
-			}}
-		>
+		<div className="pagination-container">
 			{/* Left side: Info */}
-			<div style={{fontSize: '14px', color: '#757575'}}>
-				Página {page} de {totalPages}
+			<div className="pagination-info">
+				<span>
+					Página {page} de {totalPages}
+				</span>
 			</div>
 
-			{/* Center: Page numbers */}
-			<div style={{display: 'flex', gap: '4px', alignItems: 'center'}}>
+			{/* Center: Page controls and numbers */}
+			<div className="pagination-controls">
 				<button
+					className="pagination-btn"
 					onClick={() => onPageChange(1)}
 					disabled={!hasPrev}
-					style={{
-						padding: '8px 12px',
-						background: hasPrev ? 'white' : '#f5f5f5',
-						border: '1px solid #e0e0e0',
-						borderRadius: '4px',
-						cursor: hasPrev ? 'pointer' : 'not-allowed',
-						color: hasPrev ? '#212121' : '#9e9e9e',
-					}}
+					title="Primera página"
 				>
-					<span className="material-icons" style={{fontSize: '16px'}}>
-						first_page
-					</span>
+					<span className="material-icons">first_page</span>
 				</button>
 
 				<button
+					className="pagination-btn"
 					onClick={() => onPageChange(page - 1)}
 					disabled={!hasPrev}
-					style={{
-						padding: '8px 12px',
-						background: hasPrev ? 'white' : '#f5f5f5',
-						border: '1px solid #e0e0e0',
-						borderRadius: '4px',
-						cursor: hasPrev ? 'pointer' : 'not-allowed',
-						color: hasPrev ? '#212121' : '#9e9e9e',
-					}}
+					title="Página anterior"
 				>
-					<span className="material-icons" style={{fontSize: '16px'}}>
-						chevron_left
-					</span>
+					<span className="material-icons">chevron_left</span>
 				</button>
 
-				<div style={{display: 'flex', gap: '4px', margin: '0 8px'}}>
-					{renderPageNumbers()}
-				</div>
+				<div className="page-numbers">{renderPageNumbers()}</div>
 
 				<button
+					className="pagination-btn"
 					onClick={() => onPageChange(page + 1)}
 					disabled={!hasNext}
-					style={{
-						padding: '8px 12px',
-						background: hasNext ? 'white' : '#f5f5f5',
-						border: '1px solid #e0e0e0',
-						borderRadius: '4px',
-						cursor: hasNext ? 'pointer' : 'not-allowed',
-						color: hasNext ? '#212121' : '#9e9e9e',
-					}}
+					title="Página siguiente"
 				>
-					<span className="material-icons" style={{fontSize: '16px'}}>
-						chevron_right
-					</span>
+					<span className="material-icons">chevron_right</span>
 				</button>
 
 				<button
+					className="pagination-btn"
 					onClick={() => onPageChange(totalPages)}
 					disabled={!hasNext}
-					style={{
-						padding: '8px 12px',
-						background: hasNext ? 'white' : '#f5f5f5',
-						border: '1px solid #e0e0e0',
-						borderRadius: '4px',
-						cursor: hasNext ? 'pointer' : 'not-allowed',
-						color: hasNext ? '#212121' : '#9e9e9e',
-					}}
+					title="Última página"
 				>
-					<span className="material-icons" style={{fontSize: '16px'}}>
-						last_page
-					</span>
+					<span className="material-icons">last_page</span>
 				</button>
 			</div>
 
 			{/* Right side: Page size */}
 			<div
-				style={{display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px'}}
+				style={{
+					display: 'flex',
+					alignItems: 'center',
+					gap: 'var(--spacing-md)',
+					fontSize: '14px',
+				}}
 			>
-				<label htmlFor="pageSize">Resultados por página:</label>
+				<label
+					htmlFor="pageSize"
+					style={{fontWeight: '500', color: 'var(--text-secondary)'}}
+				>
+					Resultados:
+				</label>
 				<select
 					id="pageSize"
+					className="page-size-select"
 					value={limit}
 					onChange={(e) => onPageSizeChange(parseInt(e.target.value))}
-					style={{
-						padding: '6px 8px',
-						border: '1px solid #e0e0e0',
-						borderRadius: '4px',
-						fontSize: '14px',
-						fontFamily: 'inherit',
-						cursor: 'pointer',
-						outline: 'none',
-					}}
 				>
 					<option value="12">12</option>
 					<option value="24">24</option>

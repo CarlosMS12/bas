@@ -148,73 +148,22 @@ export function AddStudentModal({
 	if (!isOpen) return null;
 
 	return (
-		<div
-			style={{
-				position: 'fixed',
-				inset: 0,
-				background: 'rgba(0, 0, 0, 0.5)',
-				display: 'flex',
-				justifyContent: 'center',
-				alignItems: 'center',
-				zIndex: 999,
-				padding: '16px',
-			}}
-			onClick={handleClose}
-		>
-			<div
-				style={{
-					background: 'white',
-					borderRadius: '12px',
-					maxWidth: '600px',
-					width: '100%',
-					maxHeight: '90vh',
-					overflowY: 'auto',
-					boxShadow: '0 14px 28px rgba(0, 0, 0, 0.25)',
-				}}
-				onClick={(e) => e.stopPropagation()}
-			>
+		<div className="modal-overlay show" onClick={handleClose}>
+			<div className="modal" onClick={(e) => e.stopPropagation()}>
 				{/* Header */}
-				<div
-					style={{
-						display: 'flex',
-						justifyContent: 'space-between',
-						alignItems: 'center',
-						padding: '24px',
-						borderBottom: '1px solid #e0e0e0',
-					}}
-				>
-					<h2 style={{fontSize: '20px', fontWeight: '600'}}>Agregar Nuevo Estudiante</h2>
-					<button
-						onClick={handleClose}
-						style={{
-							background: 'none',
-							border: 'none',
-							cursor: 'pointer',
-							padding: '8px',
-							display: 'flex',
-							alignItems: 'center',
-						}}
-					>
-						<span className="material-icons">close</span>
+				<div className="modal-header">
+					<h3>Agregar Nuevo Estudiante</h3>
+					<button className="modal-close" onClick={handleClose} aria-label="Cerrar modal">
+						×
 					</button>
 				</div>
 
 				{/* Content */}
-				<div
-					style={{padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px'}}
-				>
+				<div className="modal-content">
 					{/* Student Info */}
-					<div>
-						<h3 style={{fontSize: '16px', fontWeight: '600', marginBottom: '16px'}}>
-							Información del Estudiante
-						</h3>
-						<div
-							style={{
-								display: 'grid',
-								gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-								gap: '16px',
-							}}
-						>
+					<div className="form-section">
+						<h3>Información del Estudiante</h3>
+						<div className="form-grid">
 							<FormField
 								label="Nombres *"
 								name="nombres"
@@ -290,17 +239,9 @@ export function AddStudentModal({
 					</div>
 
 					{/* Apoderado Info */}
-					<div>
-						<h3 style={{fontSize: '16px', fontWeight: '600', marginBottom: '16px'}}>
-							Información del Apoderado
-						</h3>
-						<div
-							style={{
-								display: 'grid',
-								gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-								gap: '16px',
-							}}
-						>
+					<div className="form-section">
+						<h3>Información del Apoderado</h3>
+						<div className="form-grid">
 							<FormField
 								label="Nombres"
 								name="apoderado_nombres"
@@ -342,17 +283,9 @@ export function AddStudentModal({
 					</div>
 
 					{/* Dirección Info */}
-					<div>
-						<h3 style={{fontSize: '16px', fontWeight: '600', marginBottom: '16px'}}>
-							Información de Dirección
-						</h3>
-						<div
-							style={{
-								display: 'grid',
-								gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-								gap: '16px',
-							}}
-						>
+					<div className="form-section">
+						<h3>Información de Dirección</h3>
+						<div className="form-grid">
 							<FormField
 								label="Departamento"
 								name="direccion_departamento"
@@ -386,48 +319,12 @@ export function AddStudentModal({
 				</div>
 
 				{/* Footer */}
-				<div
-					style={{
-						display: 'flex',
-						gap: '8px',
-						padding: '24px',
-						borderTop: '1px solid #e0e0e0',
-						justifyContent: 'flex-end',
-					}}
-				>
-					<button
-						onClick={handleClose}
-						style={{
-							padding: '10px 16px',
-							background: '#f5f5f5',
-							color: '#212121',
-							border: '1px solid #e0e0e0',
-							borderRadius: '6px',
-							cursor: 'pointer',
-							fontSize: '14px',
-							fontWeight: '500',
-						}}
-					>
+				<div className="modal-footer">
+					<button className="cancel-btn" onClick={handleClose}>
 						Cancelar
 					</button>
-					<button
-						onClick={handleSubmit}
-						disabled={isLoading}
-						style={{
-							padding: '10px 16px',
-							background: isLoading ? '#90caf9' : '#4caf50',
-							color: 'white',
-							border: 'none',
-							borderRadius: '6px',
-							cursor: isLoading ? 'not-allowed' : 'pointer',
-							fontSize: '14px',
-							fontWeight: '500',
-							display: 'flex',
-							alignItems: 'center',
-							gap: '8px',
-						}}
-					>
-						<span className="material-icons" style={{fontSize: '16px'}}>
+					<button className="save-btn" onClick={handleSubmit} disabled={isLoading}>
+						<span className="material-icons">
 							{isLoading ? 'hourglass_empty' : 'person_add'}
 						</span>
 						{isLoading ? 'Guardando...' : 'Agregar Estudiante'}
@@ -449,17 +346,8 @@ function FormField({
 	maxLength = '',
 }) {
 	return (
-		<div style={{display: 'flex', flexDirection: 'column'}}>
-			<label
-				style={{
-					fontSize: '12px',
-					fontWeight: '600',
-					marginBottom: '6px',
-					color: '#757575',
-				}}
-			>
-				{label}
-			</label>
+		<div className="form-field">
+			<label>{label}</label>
 			<input
 				type={type}
 				name={name}
@@ -467,64 +355,22 @@ function FormField({
 				onChange={onChange}
 				placeholder={placeholder}
 				maxLength={maxLength}
-				style={{
-					padding: '8px 12px',
-					border: error ? '2px solid #b00020' : '1px solid #e0e0e0',
-					borderRadius: '6px',
-					fontSize: '14px',
-					fontFamily: 'inherit',
-					outline: 'none',
-					transition: 'all 0.2s ease',
-				}}
-				onFocus={(e) => {
-					if (!error) e.target.style.borderColor = '#1976d2';
-				}}
-				onBlur={(e) => {
-					if (!error) e.target.style.borderColor = '#e0e0e0';
-				}}
+				className={error ? 'error' : ''}
 			/>
-			{error && (
-				<span style={{fontSize: '12px', color: '#b00020', marginTop: '4px'}}>
-					{error}
-				</span>
-			)}
+			{error && <span className="form-field-error">{error}</span>}
 		</div>
 	);
 }
 
 function SelectFormField({label, name, value, onChange, error, options}) {
 	return (
-		<div style={{display: 'flex', flexDirection: 'column'}}>
-			<label
-				style={{
-					fontSize: '12px',
-					fontWeight: '600',
-					marginBottom: '6px',
-					color: '#757575',
-				}}
-			>
-				{label}
-			</label>
+		<div className="form-field">
+			<label>{label}</label>
 			<select
 				name={name}
 				value={value}
 				onChange={onChange}
-				style={{
-					padding: '8px 12px',
-					border: error ? '2px solid #b00020' : '1px solid #e0e0e0',
-					borderRadius: '6px',
-					fontSize: '14px',
-					fontFamily: 'inherit',
-					outline: 'none',
-					cursor: 'pointer',
-					transition: 'all 0.2s ease',
-				}}
-				onFocus={(e) => {
-					if (!error) e.target.style.borderColor = '#1976d2';
-				}}
-				onBlur={(e) => {
-					if (!error) e.target.style.borderColor = '#e0e0e0';
-				}}
+				className={error ? 'error' : ''}
 			>
 				{options.map((opt) => (
 					<option key={opt.value} value={opt.value}>
@@ -532,11 +378,7 @@ function SelectFormField({label, name, value, onChange, error, options}) {
 					</option>
 				))}
 			</select>
-			{error && (
-				<span style={{fontSize: '12px', color: '#b00020', marginTop: '4px'}}>
-					{error}
-				</span>
-			)}
+			{error && <span className="form-field-error">{error}</span>}
 		</div>
 	);
 }
