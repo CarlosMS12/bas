@@ -91,6 +91,7 @@ export async function getStudents(page = 1, limit = 24) {
 				: null,
 			direccion: row.direcciones
 				? {
+						id: row.direccion_id,
 						departamento: row.direcciones.departamento,
 						provincia: row.direcciones.provincia,
 						distrito: row.direcciones.distrito,
@@ -184,6 +185,7 @@ export async function getStudentById(id) {
 				: null,
 			direccion: data.direcciones
 				? {
+						id: data.direccion_id,
 						departamento: data.direcciones.departamento,
 						provincia: data.direcciones.provincia,
 						distrito: data.direcciones.distrito,
@@ -562,6 +564,7 @@ export async function searchStudents(filters = {}, page = 1, limit = 24) {
 				: null,
 			direccion: row.direcciones
 				? {
+						id: row.direccion_id,
 						departamento: row.direcciones.departamento,
 						provincia: row.direcciones.provincia,
 						distrito: row.direcciones.distrito,
